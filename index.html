@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>네토그린 데이터 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --card2: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6;
+    --green: #22c55e; --yellow: #eab308; --red: #ef4444; --orange: #f97316; --purple: #a855f7;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo',sans-serif; background:var(--bg); color:var(--text); }
+  .header { background:linear-gradient(135deg,#1e3a5f,#0f172a); padding:24px 32px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center; }
+  .header h1 { font-size:22px; font-weight:700; }
+  .header h1 span { color:var(--accent); }
+  .header .meta { font-size:13px; color:var(--muted); }
+  .tabs { display:flex; gap:4px; padding:12px 32px; background:#1a2332; border-bottom:1px solid #334155; overflow-x:auto; }
+  .tab { padding:8px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:500; color:var(--muted); transition:.2s; white-space:nowrap; }
+  .tab:hover { background:var(--card); color:var(--text); }
+  .tab.active { background:var(--accent); color:#fff; }
+  .container { padding:24px 32px; max-width:1440px; margin:0 auto; }
+  .grid { display:grid; gap:20px; }
+  .grid-2 { grid-template-columns:1fr 1fr; }
+  .grid-3 { grid-template-columns:1fr 1fr 1fr; }
+  .grid-4 { grid-template-columns:repeat(4,1fr); }
+  .card { background:var(--card); border-radius:12px; padding:20px; border:1px solid #334155; }
+  .card h3 { font-size:15px; font-weight:600; margin-bottom:14px; color:var(--muted); }
+  .stat-card { text-align:center; }
+  .stat-card .number { font-size:36px; font-weight:800; color:var(--accent); }
+  .stat-card .label { font-size:12px; color:var(--muted); margin-top:4px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; padding:10px 12px; background:var(--card2); color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; }
+  td { padding:10px 12px; border-bottom:1px solid #2d3748; }
+  tr:hover td { background:rgba(59,130,246,.05); }
+  .grade { display:inline-block; padding:2px 10px; border-radius:12px; font-weight:700; font-size:12px; }
+  .grade-A { background:rgba(34,197,94,.15); color:var(--green); }
+  .grade-B { background:rgba(59,130,246,.15); color:var(--accent); }
+  .grade-C { background:rgba(234,179,8,.15); color:var(--yellow); }
+  .grade-D { background:rgba(239,68,68,.15); color:var(--red); }
+  .bar { height:8px; border-radius:4px; background:#2d3748; overflow:hidden; min-width:60px; }
+  .bar-fill { height:100%; border-radius:4px; transition:width .5s; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; margin:2px; }
+  .badge-blue { background:rgba(59,130,246,.15); color:var(--accent); }
+  .badge-green { background:rgba(34,197,94,.15); color:var(--green); }
+  .badge-orange { background:rgba(249,115,22,.15); color:var(--orange); }
+  .badge-purple { background:rgba(168,85,247,.15); color:var(--purple); }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .section { display:none; }
+  .section.active { display:block; }
+  .kpi-progress { display:flex; align-items:center; gap:10px; }
+  .kpi-progress .bar { flex:1; }
+  .kpi-progress .pct { font-size:12px; font-weight:600; min-width:35px; }
+  .finding { padding:14px; border-left:3px solid var(--accent); background:rgba(59,130,246,.05); border-radius:0 8px 8px 0; margin-bottom:10px; }
+  .finding.warn { border-left-color:var(--red); background:rgba(239,68,68,.05); }
+  .finding.ok { border-left-color:var(--green); background:rgba(34,197,94,.05); }
+  .finding .title { font-weight:600; font-size:14px; margin-bottom:4px; }
+  .finding .desc { font-size:12px; color:var(--muted); }
+  .chart-wrap { position:relative; height:260px; }
+  .period-toggle { display:flex; gap:4px; background:var(--card2); border-radius:8px; padding:3px; }
+  .period-btn { padding:6px 14px; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:var(--muted); transition:.2s; }
+  .period-btn.active { background:var(--accent); color:#fff; }
+  .period-btn:hover:not(.active) { background:rgba(59,130,246,.15); color:var(--text); }
+  .keydoc { border-left:3px solid; padding-left:14px; margin-bottom:16px; }
+  .keydoc-title { font-weight:700; margin-bottom:8px; }
+  .keydoc-item { font-size:13px; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
+  .keydoc-item .freq { font-size:10px; color:var(--muted); background:var(--card2); padding:1px 6px; border-radius:4px; }
+  @media (max-width:900px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🌱 네토그린 <span>데이터 대시보드</span></h1>
+    <div class="meta">Notion · Google Drive 데이터 생성 중심 | 채널톡(메신저) 별도</div>
+  </div>
+  <div style="text-align:right">
+    <div class="meta" id="lastUpdate"></div>
+    <div class="meta" id="driveStatus" style="color:var(--green)">⏳ Drive 데이터 로딩 중...</div>
+    <!-- 관리자 로그인 -->
+    <div id="adminLoginArea" style="margin-top:6px">
+      <button id="adminLoginBtn" onclick="document.getElementById('adminModal').style.display='flex'" style="background:none;border:1px solid #334155;color:var(--muted);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px">🔒 관리자</button>
+    </div>
+    <div id="adminLogoutArea" style="margin-top:6px;display:none">
+      <span style="color:var(--green);font-size:11px">🔓 관리자 모드</span>
+      <button onclick="logoutAdmin()" style="background:none;border:1px solid #334155;color:var(--muted);padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10px;margin-left:6px">로그아웃</button>
+    </div>
+  </div>
+</div>
+
+<!-- 관리자 로그인 모달 -->
+<div id="adminModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center">
+  <div style="background:#1e293b;border-radius:12px;padding:32px;width:320px;text-align:center">
+    <div style="font-size:24px;margin-bottom:8px">🔒</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px">관리자 로그인</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:20px">CEO 전용 데이터를 보려면 비밀번호를 입력하세요</div>
+    <input id="adminPwInput" type="password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')loginAdmin()" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f1f5f9;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+    <div id="adminPwError" style="color:#ef4444;font-size:12px;margin-bottom:10px;display:none">비밀번호가 틀렸습니다</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('adminModal').style.display='none'" style="flex:1;padding:10px;border-radius:8px;border:1px solid #334155;background:none;color:var(--muted);cursor:pointer">취소</button>
+      <button onclick="loginAdmin()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:white;cursor:pointer;font-weight:600">로그인</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .admin-only { display: none !important; }
+  body.admin-mode .admin-only { display: revert !important; }
+  body.admin-mode .admin-only-inline { display: inline !important; }
+  body.admin-mode .admin-only-flex { display: flex !important; }
+  body.admin-mode .admin-only-block { display: block !important; }
+  body.admin-mode .admin-only-grid { display: grid !important; }
+  body.admin-mode .admin-only-table-row { display: table-row !important; }
+</style>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview')">📊 종합 현황</div>
+  <div class="tab" onclick="showTab('team-kpi')">🎯 팀별 KPI</div>
+  <div class="tab admin-only" onclick="showTab('employee')">👤 직원별 활동</div>
+  <div class="tab" onclick="showTab('key-docs')">🔑 Key Documents</div>
+  <div class="tab admin-only" onclick="showTab('kpi-mapping')">📈 KPI 매핑</div>
+  <div class="tab" onclick="showTab('notion-tab')">📝 Notion</div>
+  <div class="tab" onclick="showTab('drive-live')">☁️ Drive</div>
+  <div class="tab admin-only" onclick="showTab('channel-talk')">💬 채널톡</div>
+  <div class="tab admin-only" onclick="showTab('insights')">💡 인사이트</div>
+</div>
+
+<div class="container">
+
+<!-- ===== TAB 1: 종합 현황 ===== -->
+<div id="overview" class="section active">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:18px;font-weight:700">📅 데이터 생성 현황 <span style="font-size:13px;color:var(--muted);font-weight:400">(Notion + Drive)</span></h2>
+    <div class="period-toggle">
+      <button class="period-btn active" onclick="setPeriod('weekly',this)">위클리</button>
+      <button class="period-btn" onclick="setPeriod('monthly',this)">먼슬리</button>
+      <button class="period-btn" onclick="setPeriod('yearly',this)">연간</button>
+      <button class="period-btn" onclick="setPeriod('cumulative',this)">누적</button>
+    </div>
+  </div>
+
+  <div class="grid grid-4" style="margin-bottom:20px">
+    <div class="card stat-card"><div class="number" id="statNotion">—</div><div class="label" id="statNotionLabel">Notion 활동</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--green)" id="statDrive">—</div><div class="label" id="statDriveLabel">Drive 문서</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--purple)" id="statTotal">—</div><div class="label" id="statTotalLabel">총 데이터 생성</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--orange)" id="statAvg">—</div><div class="label">1인당 평균</div></div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card admin-only">
+      <h3 id="rankTitle">🏆 금주 직원별 데이터 생성 랭킹</h3>
+      <table>
+        <thead><tr><th>#</th><th>이름</th><th>팀</th><th>Notion</th><th>Drive</th><th>합계</th><th>전기 대비</th></tr></thead>
+        <tbody id="rankTable"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>📊 팀별 데이터 생성 비중</h3>
+      <div class="chart-wrap"><canvas id="chartTeamPie"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Key Document 미리보기 -->
+  <div class="card" style="margin-top:20px">
+    <h3>🔑 팀별 가장 자주 수정한 문서 Top 3 <span style="font-size:11px;color:var(--muted);font-weight:400">(수정 빈도 = Revision 수 기준)</span></h3>
+    <div id="teamTop3Container" class="grid grid-4" style="gap:16px;margin-top:8px">
+      <div class="keydoc" style="border-color:var(--accent)">
+        <div class="keydoc-title" style="color:var(--accent)">CEO (임형준)</div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1Gyy9TyxmidhnwmmUNJdVy-7lMvHdE-gL8HaIbDvKJww/edit" target="_blank">인사</a><span class="freq">26회</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1aRy887FinePLmpJDqe47a6PuICqnnNot3QEjUYRJDyw/edit" target="_blank">조직도</a><span class="freq">15회</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1POn0Ns_Wir3HQ9E6Or4raCWNNNQUTcSo6mqBv7ST7cY/edit" target="_blank">네토그린_출자검토_Term_Condition</a><span class="freq">11회</span></div>
+      </div>
+      <div class="keydoc" style="border-color:var(--accent)">
+        <div class="keydoc-title" style="color:var(--accent)">Biz. (신용재·손소희·최연식)</div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1frmudLKt3hv9x23CI6wf7b1gWG9epa36Z0q9SLxGHf0/edit" target="_blank">수요&공급, 마케팅비용</a><span class="freq">128회 (손소희·최연식)</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1tmNkKKt9iMFGOY3VTce_OXOLhJ2xOEpg3LIPv1_caLY/edit" target="_blank">농장주 정보</a><span class="freq">99회 (신용재·손소희·최연식)</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1S2AsZBbgQltUHwa6tjFsxRiFsa6digVO8H9FJEWZGgg/edit" target="_blank">프로모션</a><span class="freq">69회 (손소희·최연식·신용재)</span></div>
+      </div>
+      <div class="keydoc" style="border-color:var(--green)">
+        <div class="keydoc-title" style="color:var(--green)">Engineer (상승규)</div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1hbYBCxnxTY3HFXoIUhaCR3q0ys1BHRxYHFLPeMUTHuQ/edit" target="_blank">COGS</a><span class="freq">150회</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1F_iA0E7jyzYqcHNZ6t6r4yUWL2Q8JfsSoRPsl13fE-w/edit" target="_blank">발주서_주연하이테크</a><span class="freq">51회</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1IxbqunPBDMTtmwczByq6H2XIAbqCM86tvEbJsxaoDcs/edit" target="_blank">입출고 & 재고 관리 시트_V0</a><span class="freq">44회</span></div>
+      </div>
+      <div class="keydoc" style="border-color:var(--purple)">
+        <div class="keydoc-title" style="color:var(--purple)">Dev. (최형준·최종윤·이희선)</div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1xOf4-sgiI8T2uVp44-X-d8q5-0xumAnRXbovIf16xVs/edit" target="_blank">농장별 재배환경관리_V1</a><span class="freq">140회 (이희선·최종윤·최형준)</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1_bgD4ms3_0FsC2_3cVWFj9UGna0LSEOAjuAzvtl4S4w/edit" target="_blank">농장별 재배유닛 현황</a><span class="freq">109회 (최종윤)</span></div>
+        <div class="keydoc-item"><span class="badge badge-green">Sheets</span><a href="https://docs.google.com/spreadsheets/d/1ats-pNCHn5NI-HenieWQ-xbwunl03bWjSj89x5f03Uo/edit" target="_blank">고양3 New</a><span class="freq">52회 (최종윤)</span></div>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--muted)" id="top3Source">✅ Revision(수정 이력) 기반 Top 3 — 실제 편집자(lastModifyingUser) 기준 개인별 수정 횟수 집계</div>
+  </div>
+</div>
+
+<!-- ===== TAB 2: 팀별 KPI ===== -->
+<div id="team-kpi" class="section">
+  <!-- Biz 팀: Account + Biz 2개 카드 -->
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card" style="border-top:3px solid var(--accent)">
+      <h3 style="color:var(--accent)">🏢 Account part — B2C 표준모델영업</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">신용재(이사/Sales) · 담당: 쇼룸 미팅 → 계약 전환 · <a href="https://docs.google.com/spreadsheets/d/1s78cE8EW2AHZ3Nnys1WGV2CYq2jfRP8_yjUPY1A36vE/edit?gid=757589451#gid=757589451" target="_blank" style="color:var(--accent)">쇼룸 DB ↗</a></div>
+      <div class="grid grid-2" style="gap:8px;margin-bottom:12px">
+        <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--red)">0 / 12동</div>
+          <div style="font-size:11px;color:var(--muted)">2026 계약 (목표 12동 · 20.1억)</div>
+        </div>
+        <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--yellow)">27건</div>
+          <div style="font-size:11px;color:var(--muted)">누적 DB (1월~현재, 월 평균 7.7건)</div>
+        </div>
+      </div>
+      <table style="font-size:12px">
+        <tr><th>KPI</th><th>현재</th><th>목표</th><th>달성도</th></tr>
+        <tr><td>계약 건수</td><td><strong style="color:var(--red)">0건</strong></td><td>12동/년</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:0%;background:var(--red)"></div></div><span class="pct">0%</span></div></td></tr>
+        <tr><td>월 미팅 DB</td><td><strong style="color:var(--yellow)">7.7건/월</strong></td><td>33건/월</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:23%;background:var(--red)"></div></div><span class="pct">23%</span></div></td></tr>
+        <tr><td>견적 전환</td><td><strong>3건</strong> / 27 DB</td><td>—</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:11%;background:var(--orange)"></div></div><span class="pct">11%</span></div></td></tr>
+      </table>
+      <div style="margin-top:10px;font-size:11px;line-height:1.8">
+        <strong>파이프라인 (쇼룸 DB 기준):</strong><br>
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:var(--green);color:#000;font-weight:700;margin:2px">A 고관심·자금충족: 4건</span>
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:var(--yellow);color:#000;font-weight:700;margin:2px">B 고관심·자금부족: 12건</span>
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:var(--orange);color:#000;font-weight:700;margin:2px">C Fit불일치: 6건</span>
+        <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:var(--red);color:#fff;font-weight:700;margin:2px">D 드랍: 2건</span>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.6">
+        <strong>운영 고도화:</strong> 손익관리 · 패널티관리 · 작물중량관리 · 교육자료
+      </div>
+    </div>
+    <div class="card" style="border-top:3px solid var(--orange)">
+      <h3 style="color:var(--orange)">🛒 Biz part — 프리셀</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">손소희(대리/Operation), 최연식(사원) · 담당: 프리셀 회원 활성화 · <a href="https://docs.google.com/spreadsheets/d/1g5rGMCJDVaq764Ea5xk0SZch-Aq6gvKS0HMjKWQ5YS0/edit?gid=1887407973#gid=1887407973" target="_blank" style="color:var(--orange)">원본 시트 ↗</a></div>
+      <div class="grid grid-2" style="gap:8px;margin-bottom:12px">
+        <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--orange)">1,500명</div>
+          <div style="font-size:11px;color:var(--muted)">총 회원수 (4/6 기준)</div>
+        </div>
+        <div style="background:#0f172a;padding:10px;border-radius:8px;text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--green)">24.47%</div>
+          <div style="font-size:11px;color:var(--muted)">활성회원 A+B+C (목표 45.21%)</div>
+        </div>
+      </div>
+      <table style="font-size:12px">
+        <tr><th>등급</th><th>항목</th><th>현재(4/6)</th><th>목표</th><th>달성도</th></tr>
+        <tr><td><span style="color:var(--green);font-weight:700">A</span></td><td>정기자격 (4kg↑ 2회↑)</td><td>85명 (5.67%)</td><td><strong>14.33%</strong></td>
+          <td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:40%;background:var(--red)"></div></div><span class="pct">40%</span></div></td></tr>
+        <tr><td><span style="color:var(--yellow);font-weight:700">B</span></td><td>최근구매 (정기 미충족)</td><td>97명 (6.47%)</td><td><strong>20.70%</strong></td>
+          <td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:31%;background:var(--red)"></div></div><span class="pct">31%</span></div></td></tr>
+        <tr><td><span style="color:var(--orange);font-weight:700">C</span></td><td>휴면 (최근8주 미구매)</td><td>185명 (12.33%)</td><td><strong>10.18%↓</strong></td>
+          <td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--orange)"></div></div><span class="pct">초과</span></div></td></tr>
+        <tr><td><span style="color:var(--red);font-weight:700">D</span></td><td>미구매</td><td>1,133명 (75.53%)</td><td><strong>54.79%↓</strong></td>
+          <td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:6%;background:var(--red)"></div></div><span class="pct">6%</span></div></td></tr>
+      </table>
+      <div style="margin-top:12px"><div class="chart-wrap" style="height:200px"><canvas id="chartPresell"></canvas></div></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:right">📊 위클리 세그먼트 추이 (회원세그먼트_CRM 시트 기반)</div>
+    </div>
+  </div>
+
+  <!-- Engineer + Dev 팀 -->
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card" style="border-top:3px solid var(--green)">
+      <h3 style="color:var(--green)">🔧 Engineer 팀 KPI</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">상승규(팀장)</div>
+      <table>
+        <tr><th>KPI</th><th>2025→2026</th><th>진행도</th></tr>
+        <tr><td>원가율</td><td>51.9%→50%</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:80%;background:var(--green)"></div></div><span class="pct">80%</span></div></td></tr>
+        <tr><td>시공 건수</td><td>15→40건</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:25%;background:var(--red)"></div></div><span class="pct">25%</span></div></td></tr>
+        <tr><td>시공 속도(10동)</td><td>54→45일</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:60%;background:var(--yellow)"></div></div><span class="pct">60%</span></div></td></tr>
+        <tr><td>AS 건수</td><td>24→15건↓</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:50%;background:var(--orange)"></div></div><span class="pct">50%</span></div></td></tr>
+        <tr><td>재배사 관리자 육성</td><td>1→4명</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:30%;background:var(--red)"></div></div><span class="pct">30%</span></div></td></tr>
+        <tr><td>견적 건수</td><td>90→120건</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:35%;background:var(--orange)"></div></div><span class="pct">35%</span></div></td></tr>
+      </table>
+    </div>
+    <div class="card" style="border-top:3px solid var(--purple)">
+      <h3 style="color:var(--purple)">💻 Dev. 팀 KPI</h3>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">최형준(팀장), 최종윤(과장/Data), 이희선(사원/Lab.)</div>
+      <table>
+        <tr><th>KPI</th><th>목표</th><th>진행도</th></tr>
+        <tr><td>식물공장 모니터링</td><td>시스템 안정화</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:70%;background:var(--green)"></div></div><span class="pct">70%</span></div></td></tr>
+        <tr><td>재배ERP 고도화</td><td>핵심기능 완료</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:55%;background:var(--yellow)"></div></div><span class="pct">55%</span></div></td></tr>
+        <tr><td>양액 Recipe 표준화</td><td>전 농장 적용</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:40%;background:var(--orange)"></div></div><span class="pct">40%</span></div></td></tr>
+        <tr><td>하이브리드 온실 R&D</td><td>프로토타입</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:30%;background:var(--red)"></div></div><span class="pct">30%</span></div></td></tr>
+        <tr><td>신규 Platform 개발</td><td>MVP 배포</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:25%;background:var(--red)"></div></div><span class="pct">25%</span></div></td></tr>
+        <tr><td>무농약 인증 관리</td><td>인증 유지</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:90%;background:var(--green)"></div></div><span class="pct">90%</span></div></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 3: 직원별 활동 ===== -->
+<div id="employee" class="section">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h3 style="margin:0">👤 직원별 데이터 생성 활동 (Notion + Drive)</h3>
+    <div class="period-toggle">
+      <button class="period-btn active" onclick="setPeriodEmp('weekly',this)">위클리</button>
+      <button class="period-btn" onclick="setPeriodEmp('monthly',this)">먼슬리</button>
+      <button class="period-btn" onclick="setPeriodEmp('yearly',this)">연간</button>
+      <button class="period-btn" onclick="setPeriodEmp('cumulative',this)">누적</button>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:20px">
+    <table>
+      <thead><tr><th>이름</th><th>팀</th><th>직급</th><th>Notion 페이지</th><th>Drive 문서</th><th>합계(데이터)</th><th>등급</th><th style="color:var(--muted)">참고:업무요청</th></tr></thead>
+      <tbody id="empTable"></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>📊 직원별 데이터 생성 비교</h3>
+    <div class="chart-wrap" style="height:320px"><canvas id="chartEmployee"></canvas></div>
+  </div>
+  <!-- 금주 개인별 생성·수정 데이터 (Notion + Drive 링크) — 동적 렌더링 -->
+  <div class="card admin-only" style="margin-top:20px">
+    <h3>📋 금주 개인별 생성·수정 데이터 <span id="weekRangeLabel" style="font-size:11px;color:var(--muted);font-weight:400">(자동 계산 중...)</span></h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">각 직원이 이번 주 생성하거나 수정한 데이터를 한눈에 볼 수 있습니다. 링크를 클릭하면 해당 문서로 이동합니다.<br>✅ created 날짜가 금주인 파일 → <span style="color:#facc15">Drive 생성</span> / 기존 파일 수정 → <span style="color:var(--green)">Drive 수정</span> (Revision API 기준)</p>
+    <div id="weeklyPersonGrid" class="grid grid-2" style="gap:12px">
+      <div style="text-align:center;color:var(--muted);padding:40px;grid-column:1/-1">⏳ Drive 데이터 로딩 중... (API에서 자동 갱신됩니다)</div>
+    </div>
+  </div>
+
+  <!-- FALLBACK: 아래 하드코딩 섹션은 API 로드 성공 시 위 동적 컨테이너로 대체됩니다 -->
+  <div id="weeklyPersonFallback" class="card admin-only" style="margin-top:20px;display:none">
+    <div class="grid grid-2" style="gap:12px">
+      <!-- 임형준 (정적 폴백) -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:8px">임형준 <span style="color:var(--muted);font-weight:400;font-size:12px">CEO · 생성 12건 · 수정 10건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:8px">— 이번 주 생성 없음</div>
+        <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (12건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1FFu_f4H1zyjpvHQRR7pwgcJisML6pN8AZapO17LMVXQ/edit" target="_blank">프리셀 매출 증빙 (세금계산서 기준)</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/1noKE450mtvkggk_TrMl_-NxALJaISYp4NPNFozcPTQ8/edit" target="_blank">임직원 현황 (4대보험 기준)</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/1-NvVKc8e9ZZoe0yv7NHg5X2p-eDEnEI73KlR3fT1FuE/edit" target="_blank">설치 실적 세부 구분</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/13l2rc0t_4jZFCpiSfLM8hUEzsvVmDALGVfHMt7ybZQI/edit" target="_blank">매출 Breakdown (법인별 구분)</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/1K7tRCYt8ljZUBbjdS-mFy8rR4mOfI5vbFPW-UIpGSQw/edit" target="_blank">추가요청 체크리스트</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <span style="color:var(--muted);font-size:11px">+7건 더 (지자체 협력, 고양시 클러스터, 여주 스마트팜 등)</span>
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (10건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1s78cE8EW2AHZ3Nnys1WGV2CYq2jfRP8_yjUPY1A36vE/edit" target="_blank">쇼룸 방문 DB</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1g5rGMCJDVaq764Ea5xk0SZch-Aq6gvKS0HMjKWQ5YS0/edit" target="_blank">회원세그먼트_CRM</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1Gyy9TyxmidhnwmmUNJdVy-7lMvHdE-gL8HaIbDvKJww/edit" target="_blank">인사</a> <span class="badge badge-green">Sheets</span> 4/12<br>
+          <a href="https://docs.google.com/spreadsheets/d/1eo0JmDWFgrbAuNs6TBCO4ufdyyXU4VUPuAoaQHemEK8/edit" target="_blank">진안1 New</a> <span class="badge badge-green">Sheets</span> 4/12<br>
+          <a href="https://docs.google.com/spreadsheets/d/1-fXWnZ222Nw8liBaCZ8x99LSen57xFvLCgN3e8-G-2U/edit" target="_blank">프리셀 KPI 시트</a> <span class="badge badge-green">Sheets</span> 4/12<br>
+          <span style="color:var(--muted);font-size:11px">+5건 더</span>
+        </div>
+      </div>
+      <!-- 신용재 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:8px">신용재 <span style="color:var(--muted);font-weight:400;font-size:12px">Biz.(Sales) · 생성 4건 · 수정 22건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://www.notion.so/netogreenkr/" target="_blank">[경광주1] 산도조절제 제조 요청</a> <span class="badge badge-orange">Notion</span> 4/10<br>
+          <a href="https://www.notion.so/netogreenkr/" target="_blank">[화성5] 산도조절제 제조 요청</a> <span class="badge badge-orange">Notion</span> 4/10
+        </div>
+        <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (4건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/10gZO-ex1PAU1rIa_8QEz25zhWEOzoSqtc79K5ejPHgw/edit" target="_blank">네토그린 스마트농업 세일즈 스크립트 사본</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://drive.google.com/file/d/1FeWLbb3ZJs08JwQzJGFmmlntzO5Bdlrl/view" target="_blank">경동택배_260410</a> <span class="badge badge-blue">Excel</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1V6JtrY2fGNRfb8RnFT4jvf10sy1n779Y4cosISLp0TU/edit" target="_blank">프리셀 정산서_3월_기류솔루션</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/1lWGeMm-HgPjZeoKWOeoWmAL-dMQ4vcvxw_PlhU_8_M8/edit" target="_blank">프리셀 농장주매입 전자계산서목록</a> <span class="badge badge-green">Sheets</span> 4/09
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (22건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1AdSdbB0HHoynedKwPoxSCn_ToYOU9Y5G4SJjR2SIJeg/edit" target="_blank">프리셀 농장별 매출</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1AmSbg_SXXln4hgGM7RL_s1Mt5AF9PyXC0ACZKcsaDX8/edit" target="_blank">박스 사용량 취합</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1i-jHNd5s1Xdel49_42-sdiRJ9-XU2SNDztfhLnepDB0/edit" target="_blank">VOC 데이터</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1Z03wUsrXPi9SIDmHpwwjqrz10HWt8iIXweGDc1ToThc/edit" target="_blank">경광주1 New</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1wLl6goUTO47mGC7P4i9D67FTkmUetXTPuZYzhjd5r30/edit" target="_blank">농장 손익 현황</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <span style="color:var(--muted);font-size:11px">+17건 더 (프리셀 정산서 10건, 배송관리 등)</span>
+        </div>
+      </div>
+      <!-- 손소희 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:8px">손소희 <span style="color:var(--muted);font-weight:400;font-size:12px">Biz.(Operation) · 생성 2건 · 수정 15건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:8px">— 이번 주 생성 없음</div>
+        <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (2건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1AdSdbB0HHoynedKwPoxSCn_ToYOU9Y5G4SJjR2SIJeg/edit" target="_blank">프리셀 농장별 매출</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/10aqPzyZcBiaujSDXpp7lwZk8ky0fvbQg9KgwlUrQu60/edit" target="_blank">대추방울토마토 단가표</a> <span class="badge badge-green">Sheets</span> 4/09
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (15건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1DOQkZBZ-M12HMadv16bJ4rSKkBZa5GN4iNdqwxCWwgA/edit" target="_blank">2024 프리셀 관리</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1S2AsZBbgQltUHwa6tjFsxRiFsa6digVO8H9FJEWZGgg/edit" target="_blank">프로모션</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1g5rGMCJDVaq764Ea5xk0SZch-Aq6gvKS0HMjKWQ5YS0/edit" target="_blank">회원세그먼트_CRM</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit" target="_blank">지축 런칭 판매촉진 현황</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1AmSbg_SXXln4hgGM7RL_s1Mt5AF9PyXC0ACZKcsaDX8/edit" target="_blank">박스 사용량 취합</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <span style="color:var(--muted);font-size:11px">+10건 더</span>
+        </div>
+      </div>
+      <!-- 상승규 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--green)">
+        <div style="font-weight:700;margin-bottom:8px">상승규 <span style="color:var(--muted);font-weight:400;font-size:12px">Engineer · 생성 13건 · 수정 16건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://www.notion.so/netogreenkr/" target="_blank">Engin. Weekly @목요일</a> <span class="badge badge-orange">Notion</span> 4/10
+        </div>
+        <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (13건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1to8z2sOlfYvpyZz35tfedvQCRBcwdYVX2KKhexMs8Rc/edit" target="_blank">프리셀 포장 박스 단가 인상</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://drive.google.com/file/d/1ccDx6mPIlKNOgvX3RNIPEw94kRN2HKr6/view" target="_blank">[Layout] 딸기 스마트팜_260412</a> <span class="badge badge-orange">PDF</span> 4/12<br>
+          <a href="https://docs.google.com/spreadsheets/d/1KqVcHFZMaCREjRn_7gpBNIAuh1x2VWx3OrdE8Zifl1M/edit" target="_blank">[견적서] 딸기 스마트팜_260412</a> <span class="badge badge-green">Sheets</span> 4/12<br>
+          <a href="https://drive.google.com/file/d/17pyILvbPgsqHD3Entivp7abUTRvzQjB5/view" target="_blank">26.3 거래명세표</a> <span class="badge badge-purple">IMG</span> 4/13<br>
+          <span style="color:var(--muted);font-size:11px">+9건 더 (일용직 계약서, 경동택배 등)</span>
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (16건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1_dD70hInk3oVGwhhOSU0glk7JEjv_sv6y4q8nVVBr0g/edit" target="_blank">지축 생산관리_V1</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://drive.google.com/file/d/1FqUZWMl20wOJS1mxItsbsYXwPnhCeIJQ/view" target="_blank">견적용 도면_V4</a> <span class="badge badge-purple">CAD</span> 4/12<br>
+          <a href="https://docs.google.com/spreadsheets/d/1AmSbg_SXXln4hgGM7RL_s1Mt5AF9PyXC0ACZKcsaDX8/edit" target="_blank">박스 사용량 취합</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1MaS14sJ1Q9dTkUEMW7O3HKB_fga5-EF1ZAH85j-T3m4/edit" target="_blank">지축 생산관리_손익계산</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <span style="color:var(--muted);font-size:11px">+12건 더</span>
+        </div>
+      </div>
+      <!-- 최형준 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--purple)">
+        <div style="font-weight:700;margin-bottom:8px">최형준 <span style="color:var(--muted);font-weight:400;font-size:12px">Dev. · 생성 6건 · 수정 6건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://www.notion.so/netogreenkr/" target="_blank">Dev. Weekly</a> <span class="badge badge-orange">Notion</span> 4/10
+        </div>
+        <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (6건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1Ll1fR80avbv9CqDmSFal4-Bs-uGe0WMAbGiubvW_FUo/edit" target="_blank">[견적서] 모듈 견적_쪽파_260409</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <a href="https://docs.google.com/spreadsheets/d/1q6Fe1eqeC229BdnKTUn4bi5x3kdzGCLvpNHaKmVhUfc/edit" target="_blank">2604_1주</a> <span class="badge badge-green">Sheets</span> 4/08<br>
+          <a href="https://drive.google.com/file/d/1MmKHwm7Cx4ZLGtS5CH6-Dja52r5Nemco/view" target="_blank">presell_orders_20260408</a> <span class="badge badge-blue">Excel</span> 4/08<br>
+          <span style="color:var(--muted);font-size:11px">+3건 더</span>
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (6건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1w2b4qfzATX0xz9EY0ZOYTgPqb6-pAh-EUviYpO7irX0/edit" target="_blank">양액농도_260309</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit" target="_blank">지축 런칭 판매촉진 현황</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1YyXJR20iQn_V_TPprCkYEYoSv7xBPBiYxD7mwjWbfEM/edit" target="_blank">해피팜 중량</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1fAt4u1z93KUacgnxeLGzA5jdQVYYnXa-EFLzMuS5PD0/edit" target="_blank">K-Ca Drift_260327</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1hq9ZWbXbnrYziasoK11qk9D5vCjuaQd3paScDLEV_7U/edit" target="_blank">지축 생산관리_손익계산</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <span style="color:var(--muted);font-size:11px">+1건 더</span>
+        </div>
+      </div>
+      <!-- 이희선 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--purple)">
+        <div style="font-weight:700;margin-bottom:8px">이희선 <span style="color:var(--muted);font-weight:400;font-size:12px">Dev.(Lab.) · 수정 6건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://www.notion.so/netogreenkr/" target="_blank">Lab. 위클리 @수요일</a> <span class="badge badge-orange">Notion</span> 4/7
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (6건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1fAt4u1z93KUacgnxeLGzA5jdQVYYnXa-EFLzMuS5PD0/edit" target="_blank">K-Ca Drift_260327</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1C2eqayvz2TZQjxlMNBWejwa6zLtxXQyYCKNWlw32E04/edit" target="_blank">암발아 검토</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1xOf4-sgiI8T2uVp44-X-d8q5-0xumAnRXbovIf16xVs/edit" target="_blank">농장별 재배환경관리_V1</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1hQa0H-JTIJ-ExyAX43jG89VEa70FW4ghO6bLVO-topQ/edit" target="_blank">화성4 New</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1QrN7Kc9o0zN25dp_9NLdZAo6CmQJrgZdm1O-xT04QjA/edit" target="_blank">대체 품종 검토</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <span style="color:var(--muted);font-size:11px">+1건 더</span>
+        </div>
+      </div>
+      <!-- 최연식 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:8px">최연식 <span style="color:var(--muted);font-weight:400;font-size:12px">Biz. · 수정 13건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://www.notion.so/netogreenkr/33c2b917e9b080c0a3b9f83c4faa276a" target="_blank">Biz. 위클리</a> <span class="badge badge-orange">Notion</span> 4/10
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (13건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1DOQkZBZ-M12HMadv16bJ4rSKkBZa5GN4iNdqwxCWwgA/edit" target="_blank">2024 프리셀 관리</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1S2AsZBbgQltUHwa6tjFsxRiFsa6digVO8H9FJEWZGgg/edit" target="_blank">프로모션</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1g5rGMCJDVaq764Ea5xk0SZch-Aq6gvKS0HMjKWQ5YS0/edit" target="_blank">회원세그먼트_CRM</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit" target="_blank">지축 런칭 판매촉진 현황</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1i-jHNd5s1Xdel49_42-sdiRJ9-XU2SNDztfhLnepDB0/edit" target="_blank">VOC 데이터</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <span style="color:var(--muted);font-size:11px">+8건 더 (주문관리, 단가분석, 세일즈 등)</span>
+        </div>
+      </div>
+      <!-- 최종윤 -->
+      <div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid var(--purple)">
+        <div style="font-weight:700;margin-bottom:8px">최종윤 <span style="color:var(--muted);font-weight:400;font-size:12px">Dev.(Data) · 생성 1건 · 수정 10건</span></div>
+        <div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:8px">— 이번 주 생성 없음</div>
+        <div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (1건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1VzlY_n8pLxxaJgIQ3JEFoTJ3Ez6i3wkAjQi2haXGsOE/edit" target="_blank">네고 완료 된 견적서</a> <span class="badge badge-green">Sheets</span> 4/07
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (10건)</div>
+        <div style="font-size:12px;line-height:1.8;padding-left:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1_dD70hInk3oVGwhhOSU0glk7JEjv_sv6y4q8nVVBr0g/edit" target="_blank">지축 생산관리_V1</a> <span class="badge badge-green">Sheets</span> 4/13<br>
+          <a href="https://docs.google.com/spreadsheets/d/1Mmjgrbq7xuVIbUY7rrHoRwvNA_-afIpaf-3-V4YSJ8c/edit" target="_blank">표준BOM관리</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1hQa0H-JTIJ-ExyAX43jG89VEa70FW4ghO6bLVO-topQ/edit" target="_blank">화성4 New</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/1O0PX-N7TA6jsena6LkhrnGHZ5uO-nfk9iLbXPrkQYjU/edit" target="_blank">소싱 상품 단가 분석</a> <span class="badge badge-green">Sheets</span> 4/10<br>
+          <a href="https://docs.google.com/spreadsheets/d/15QpZ7GWfC2s_qCZd7gEfpoCJPnEdpNQVuJQLsdZ0kN8/edit" target="_blank">BIZ_수요현황_통합</a> <span class="badge badge-green">Sheets</span> 4/09<br>
+          <span style="color:var(--muted);font-size:11px">+5건 더</span>
+        </div>
+      </div>
+    </div>
+  </div><!-- end weeklyPersonFallback -->
+
+  <div class="card admin-only" style="margin-top:20px">
+    <h3>📂 사람별 최근 가장 많이 사용한 문서 Top 3 <span style="font-size:11px;color:var(--muted);font-weight:400">(Drive 실시간 데이터 기준, 누적)</span></h3>
+    <div class="grid grid-2" style="gap:12px;margin-top:12px">
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:6px">임형준 <span style="color:var(--muted);font-weight:400;font-size:12px">CEO · Drive 91건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://docs.google.com/spreadsheets/d/1Gyy9TyxmidhnwmmUNJdVy-7lMvHdE-gL8HaIbDvKJww/edit" target="_blank">인사</a> <span class="badge badge-green">Sheets</span> 4/12<br>2. <a href="https://docs.google.com/spreadsheets/d/1aRy887FinePLmpJDqe47a6PuICqnnNot3QEjUYRJDyw/edit" target="_blank">조직도</a> <span class="badge badge-green">Sheets</span> 4/12<br>3. <a href="https://docs.google.com/spreadsheets/d/1s78cE8EW2AHZ3Nnys1WGV2CYq2jfRP8_yjUPY1A36vE/edit" target="_blank">쇼룸 방문 DB</a> <span class="badge badge-green">Sheets</span> 4/12</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:6px">신용재 <span style="color:var(--muted);font-weight:400;font-size:12px">Biz.(Sales) · Drive 26건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://drive.google.com/file/d/1FeWLbb3ZJs08JwQzJGFmmlntzO5Bdlrl/view" target="_blank">경동택배 배송</a> <span class="badge badge-blue">Excel</span> 4/10<br>2. <a href="https://docs.google.com/spreadsheets/d/1irKrjZ_3HhOWHIFnVTNIkEheKAtvtyZO_mWrdRl97YM/edit" target="_blank">재배 주간 업무</a> <span class="badge badge-green">Sheets</span> 4/10<br>3. <a href="https://docs.google.com/spreadsheets/d/1wLl6goUTO47mGC7P4i9D67FTkmUetXTPuZYzhjd5r30/edit" target="_blank">농장 손익 현황</a> <span class="badge badge-green">Sheets</span> 4/10</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:6px">손소희 <span style="color:var(--muted);font-weight:400;font-size:12px">Biz.(Operation) · Drive 13건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit" target="_blank">지축 런칭 판매촉진 현황</a> <span class="badge badge-green">Sheets</span> 4/10<br>2. <a href="https://docs.google.com/spreadsheets/d/1frmudLKt3hv9x23CI6wf7b1gWG9epa36Z0q9SLxGHf0/edit" target="_blank">수요&공급, 마케팅비용</a> <span class="badge badge-green">Sheets</span> 4/10<br>3. <a href="https://docs.google.com/spreadsheets/d/1g5rGMCJDVaq764Ea5xk0SZch-Aq6gvKS0HMjKWQ5YS0/edit" target="_blank">회원세그먼트_CRM</a> <span class="badge badge-green">Sheets</span> 4/10</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--green)">
+        <div style="font-weight:700;margin-bottom:6px">상승규 <span style="color:var(--muted);font-weight:400;font-size:12px">Engineer · Drive 56건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://drive.google.com/file/d/1FqUZWMl20wOJS1mxItsbsYXwPnhCeIJQ/view" target="_blank">견적용 도면_V4</a> <span class="badge badge-purple">CAD</span> 4/12<br>2. <a href="https://drive.google.com/file/d/1ccDx6mPIlKNOgvX3RNIPEw94kRN2HKr6/view" target="_blank">딸기 스마트팜 Layout</a> <span class="badge badge-orange">PDF</span> 4/12<br>3. 업체 상담 현황 <span class="badge badge-green">Sheets</span> 4/11</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--purple)">
+        <div style="font-weight:700;margin-bottom:6px">최형준 <span style="color:var(--muted);font-weight:400;font-size:12px">Dev. · Drive 87건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://docs.google.com/spreadsheets/d/1E7YMWqm7g_gkbYIh5tQuvnDY8PAj8vMaFh2cts0gWyw/edit" target="_blank">지축 VPD</a> <span class="badge badge-green">Sheets</span> 4/10<br>2. <a href="https://docs.google.com/spreadsheets/d/1fAt4u1z93KUacgnxeLGzA5jdQVYYnXa-EFLzMuS5PD0/edit" target="_blank">K-Ca Drift_260327</a> <span class="badge badge-green">Sheets</span> 4/10<br>3. <a href="https://docs.google.com/spreadsheets/d/1w2b4qfzATX0xz9EY0ZOYTgPqb6-pAh-EUviYpO7irX0/edit" target="_blank">양액농도_260309</a> <span class="badge badge-green">Sheets</span> 4/10</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--purple)">
+        <div style="font-weight:700;margin-bottom:6px">이희선 <span style="color:var(--muted);font-weight:400;font-size:12px">Dev.(Lab.) · Drive 13건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://docs.google.com/spreadsheets/d/1C2eqayvz2TZQjxlMNBWejwa6zLtxXQyYCKNWlw32E04/edit" target="_blank">암발아 검토</a> <span class="badge badge-green">Sheets</span> 4/10<br>2. <a href="https://docs.google.com/spreadsheets/d/1QrN7Kc9o0zN25dp_9NLdZAo6CmQJrgZdm1O-xT04QjA/edit" target="_blank">대체 품종 검토</a> <span class="badge badge-green">Sheets</span> 4/9<br>3. <a href="https://docs.google.com/spreadsheets/d/1YdLMEyCbQX7IrbNLe_2ma52dL2f6KtbCRwLNEuHo6jo/edit" target="_blank">육묘 2주 test</a> <span class="badge badge-green">Sheets</span> 4/8</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-weight:700;margin-bottom:6px">최연식 <span style="color:var(--muted);font-weight:400;font-size:12px">Biz. · Drive 2건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://docs.google.com/spreadsheets/d/1VErOxd65m8CC4OULsKQKyfHeekQmOLIOEO6c4_oN0nQ/edit" target="_blank">주문관리 검수 시트</a> <span class="badge badge-green">Sheets</span> 4/10<br>2. <a href="https://docs.google.com/spreadsheets/d/1uNwfMcKw0zJk0jeNIIZRHfXXhlf0yInix5HKsbWkdaQ/edit" target="_blank">프리셀 가입 고객 세일즈</a> <span class="badge badge-green">Sheets</span> 4/9</div>
+      </div>
+      <div style="background:var(--card-bg);border-radius:8px;padding:12px;border-left:3px solid var(--purple)">
+        <div style="font-weight:700;margin-bottom:6px">최종윤 <span style="color:var(--muted);font-weight:400;font-size:12px">Dev.(Data) · Drive 15건</span></div>
+        <div style="font-size:13px;line-height:2">1. <a href="https://docs.google.com/spreadsheets/d/1_dD70hInk3oVGwhhOSU0glk7JEjv_sv6y4q8nVVBr0g/edit" target="_blank">지축 생산관리_V1</a> <span class="badge badge-green">Sheets</span> 4/12<br>2. <a href="https://docs.google.com/spreadsheets/d/1hq9ZWbXbnrYziasoK11qk9D5vCjuaQd3paScDLEV_7U/edit" target="_blank">지축 생산관리_손익계산</a> <span class="badge badge-green">Sheets</span> 4/10<br>3. <a href="https://docs.google.com/spreadsheets/d/1Z03wUsrXPi9SIDmHpwwjqrz10HWt8iIXweGDc1ToThc/edit" target="_blank">경광주1 New</a> <span class="badge badge-green">Sheets</span> 4/10</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 4: Key Documents ===== -->
+<div id="key-docs" class="section">
+  <div class="card" style="margin-bottom:20px">
+    <h3>🔑 팀별 핵심 문서 — 팀원 합산 수정 빈도 Top 5 (Drive Revision 기준)</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">팀원들의 수정 횟수를 문서별로 합산하여 산출. 반복 수정하는 문서 = 실질적 업무 허브입니다.</p>
+
+    <div style="margin-bottom:24px">
+      <div style="font-weight:700;color:var(--accent);font-size:16px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--accent)">🏢 Biz. 팀 — 신용재·손소희·최연식</div>
+      <table>
+        <tr><th>문서명</th><th>유형</th><th>편집자</th><th>팀 합산</th><th>링크</th></tr>
+        <tr><td><strong>수요&공급, 마케팅비용</strong></td><td><span class="badge badge-green">Sheets</span></td><td>손소희·최연식</td><td><strong>128회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1frmudLKt3hv9x23CI6wf7b1gWG9epa36Z0q9SLxGHf0/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>농장주 정보</strong></td><td><span class="badge badge-green">Sheets</span></td><td>신용재·손소희·최연식</td><td><strong>99회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1tmNkKKt9iMFGOY3VTce_OXOLhJ2xOEpg3LIPv1_caLY/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>프로모션</strong></td><td><span class="badge badge-green">Sheets</span></td><td>손소희·최연식·신용재</td><td><strong>69회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1S2AsZBbgQltUHwa6tjFsxRiFsa6digVO8H9FJEWZGgg/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>운송장 변환(대한,우체국,화성2,소싱)</strong></td><td><span class="badge badge-green">Sheets</span></td><td>최연식</td><td><strong>69회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1ZnrusYf5pYsJIMb-TMWBDuc0jAXSehcVkZMnh4YubJI/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>소싱 상품 단가 분석</strong></td><td><span class="badge badge-green">Sheets</span></td><td>손소희·최연식</td><td><strong>58회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1O0PX-N7TA6jsena6LkhrnGHZ5uO-nfk9iLbXPrkQYjU/edit" target="_blank">열기 ↗</a></td></tr>
+      </table>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <div style="font-weight:700;color:var(--green);font-size:16px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--green)">🔧 Engineer 팀 — 상승규</div>
+      <table>
+        <tr><th>문서명</th><th>유형</th><th>편집자</th><th>팀 합산</th><th>링크</th></tr>
+        <tr><td><strong>COGS</strong></td><td><span class="badge badge-green">Sheets</span></td><td>상승규</td><td><strong>150회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1hbYBCxnxTY3HFXoIUhaCR3q0ys1BHRxYHFLPeMUTHuQ/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>발주서_주연하이테크</strong></td><td><span class="badge badge-green">Sheets</span></td><td>상승규</td><td><strong>51회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1F_iA0E7jyzYqcHNZ6t6r4yUWL2Q8JfsSoRPsl13fE-w/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>입출고 & 재고 관리 시트_V0</strong></td><td><span class="badge badge-green">Sheets</span></td><td>상승규</td><td><strong>44회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1IxbqunPBDMTtmwczByq6H2XIAbqCM86tvEbJsxaoDcs/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>지축 에이스 실제 작업 정리</strong></td><td><span class="badge badge-green">Sheets</span></td><td>상승규</td><td><strong>26회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1MbbwuaWW6ODKZa3aC-_5YlU5tqm57RHgzNmCp_DMaRE/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>V3_지축 에이스 하이엔드 타워_시공 일정표</strong></td><td><span class="badge badge-green">Sheets</span></td><td>상승규</td><td><strong>21회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1XBKv8bWh675xIlLeclA8frcOWCMC2NEeL3S9liWJm-8/edit" target="_blank">열기 ↗</a></td></tr>
+      </table>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <div style="font-weight:700;color:var(--purple);font-size:16px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--purple)">💻 Dev. 팀 — 최형준·최종윤·이희선</div>
+      <table>
+        <tr><th>문서명</th><th>유형</th><th>편집자</th><th>팀 합산</th><th>링크</th></tr>
+        <tr><td><strong>농장별 재배환경관리_V1</strong></td><td><span class="badge badge-green">Sheets</span></td><td>이희선·최종윤·최형준</td><td><strong>140회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1xOf4-sgiI8T2uVp44-X-d8q5-0xumAnRXbovIf16xVs/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>농장별 재배유닛 현황</strong></td><td><span class="badge badge-green">Sheets</span></td><td>최종윤</td><td><strong>109회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1_bgD4ms3_0FsC2_3cVWFj9UGna0LSEOAjuAzvtl4S4w/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>고양3 New</strong></td><td><span class="badge badge-green">Sheets</span></td><td>최종윤</td><td><strong>52회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1ats-pNCHn5NI-HenieWQ-xbwunl03bWjSj89x5f03Uo/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>고양1 New</strong></td><td><span class="badge badge-green">Sheets</span></td><td>최종윤</td><td><strong>46회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1R5QtA1wQtjwuovhi4pEGK7GLR1oszDmvev1RYbhRndk/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>평택1 New</strong></td><td><span class="badge badge-green">Sheets</span></td><td>최종윤</td><td><strong>44회</strong></td><td><a href="https://docs.google.com/spreadsheets/d/1hT3P7kfbWE6vsf6ncYTMgZirqIop9w5flPRhNETA8Gg/edit" target="_blank">열기 ↗</a></td></tr>
+      </table>
+    </div>
+
+    <div>
+      <div style="font-weight:700;color:var(--orange);font-size:16px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--orange)">📋 전사 — CEO(임형준) · Staff(이은혜)</div>
+      <table>
+        <tr><th>문서명</th><th>유형</th><th>편집자</th><th>합산</th><th>소속</th><th>링크</th></tr>
+        <tr><td><strong>인사</strong></td><td><span class="badge badge-green">Sheets</span></td><td>이은혜</td><td><strong>52회</strong></td><td>Staff</td><td><a href="https://docs.google.com/spreadsheets/d/1Gyy9TyxmidhnwmmUNJdVy-7lMvHdE-gL8HaIbDvKJww/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>지출내역 관리 시트</strong></td><td><span class="badge badge-green">Sheets</span></td><td>이은혜</td><td><strong>33회</strong></td><td>Staff</td><td><a href="https://docs.google.com/spreadsheets/d/1vUrY4sGnRFs0hWqw13fcMK4pn3L3f5tQ3r9GVyoZ6qE/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>인사</strong></td><td><span class="badge badge-green">Sheets</span></td><td>임형준</td><td><strong>26회</strong></td><td>CEO</td><td><a href="https://docs.google.com/spreadsheets/d/1Gyy9TyxmidhnwmmUNJdVy-7lMvHdE-gL8HaIbDvKJww/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>조직도</strong></td><td><span class="badge badge-green">Sheets</span></td><td>임형준</td><td><strong>15회</strong></td><td>CEO</td><td><a href="https://docs.google.com/spreadsheets/d/1aRy887FinePLmpJDqe47a6PuICqnnNot3QEjUYRJDyw/edit" target="_blank">열기 ↗</a></td></tr>
+        <tr><td><strong>네토그린_출자검토_Term_Condition</strong></td><td><span class="badge badge-green">Sheets</span></td><td>임형준</td><td><strong>11회</strong></td><td>CEO</td><td><a href="https://docs.google.com/spreadsheets/d/1POn0Ns_Wir3HQ9E6Or4raCWNNNQUTcSo6mqBv7ST7cY/edit" target="_blank">열기 ↗</a></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📊 Drive 실시간 — 최근 수정 문서 (Top 10)</h3>
+    <table>
+      <thead><tr><th>파일명</th><th>유형</th><th>소유자</th><th>최종수정</th><th>링크</th></tr></thead>
+      <tbody id="keyDocRecent"><tr><td colspan="5" style="text-align:center;color:var(--muted)">Drive 데이터 로딩 중...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== TAB 5: KPI 매핑 ===== -->
+<div id="kpi-mapping" class="section">
+  <div class="card" style="margin-bottom:20px">
+    <h3>📈 KPI 카테고리별 관련 데이터 건수 (Notion + Drive)</h3>
+    <div class="grid grid-2">
+      <div>
+        <table>
+          <tr><th>KPI 카테고리</th><th>관련 데이터</th><th>주요 활동자</th><th>활동 강도</th></tr>
+          <tr><td><span class="badge badge-green">영업·매출</span></td><td><strong>145건</strong></td><td>임형준, 손소희, 최연식</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:95%;background:var(--green)"></div></div></td></tr>
+          <tr><td><span class="badge badge-blue">시공·엔지니어링</span></td><td><strong>98건</strong></td><td>상승규</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:65%;background:var(--accent)"></div></div></td></tr>
+          <tr><td><span class="badge badge-orange">농장운영</span></td><td><strong>87건</strong></td><td>신용재, 이희선</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:57%;background:var(--orange)"></div></div></td></tr>
+          <tr><td><span class="badge badge-purple">개발·R&D</span></td><td><strong>65건</strong></td><td>최형준</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:43%;background:var(--purple)"></div></div></td></tr>
+          <tr><td><span class="badge badge-blue">경영·전략·기획</span></td><td><strong>52건</strong></td><td>임형준, 최종윤</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:34%;background:var(--accent)"></div></div></td></tr>
+          <tr><td><span class="badge badge-green">마케팅</span></td><td><strong>48건</strong></td><td>임형준</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:32%;background:var(--green)"></div></div></td></tr>
+          <tr><td><span class="badge badge-orange">물류·정산</span></td><td><strong>42건</strong></td><td>손소희</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:28%;background:var(--orange)"></div></div></td></tr>
+          <tr><td><span class="badge badge-purple">데이터·ERP</span></td><td><strong>35건</strong></td><td>최종윤, 최형준</td><td><div class="bar" style="width:200px"><div class="bar-fill" style="width:23%;background:var(--purple)"></div></div></td></tr>
+        </table>
+      </div>
+      <div>
+        <div class="chart-wrap"><canvas id="chartKPI"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI ↔ 생성 데이터 매핑 (통합) -->
+  <div class="card" style="margin-bottom:20px">
+    <h3>🔗 KPI ↔ 생성 데이터 매핑 — 각 KPI에 어떤 문서가 연결되어 있는가?</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">각 KPI를 추적하는 실제 데이터(Notion 페이지, Drive 문서)를 매핑합니다. 데이터가 없는 KPI = 관리 사각지대</p>
+    <div id="kpiDataMappingTable"></div>
+  </div>
+</div>
+
+<!-- ===== TAB 6: Notion ===== -->
+<div id="notion-tab" class="section">
+  <div style="margin-bottom:16px">
+    <div class="finding" style="border-left-color:var(--purple)">
+      <div class="title">📝 Notion = 업무 페이지 생성 (데이터 생성 지표)</div>
+      <div class="desc">Notion 페이지 생성은 실제 업무 산출물 생성을 의미합니다. 업무요청(notion_req)은 참고 지표로 별도 표기합니다.</div>
+    </div>
+  </div>
+
+  <div class="grid grid-3" style="margin-bottom:20px">
+    <div class="card stat-card"><div class="number" style="color:var(--purple)">139</div><div class="label">누적 Notion 페이지</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--green)">6</div><div class="label">이번 주 생성 (4/6~4/12)</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--accent)">8</div><div class="label">활성 사용자</div></div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <h3>👤 직원별 Notion 페이지 생성 (누적)</h3>
+      <table>
+        <tr><th>이름</th><th>팀</th><th>페이지 수</th><th>비율</th><th>업무요청(참고)</th></tr>
+        <tr><td><strong>임형준</strong></td><td>CEO</td><td>25</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--purple)"></div></div><span class="pct">18%</span></div></td><td style="color:var(--muted)">18</td></tr>
+        <tr><td><strong>신용재</strong></td><td>Biz.(Sales)</td><td>25</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--purple)"></div></div><span class="pct">18%</span></div></td><td style="color:var(--muted)">14</td></tr>
+        <tr><td><strong>손소희</strong></td><td>Biz.(Operation)</td><td>25</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--purple)"></div></div><span class="pct">18%</span></div></td><td style="color:var(--muted)">15</td></tr>
+        <tr><td><strong>상승규</strong></td><td>Engineer</td><td>25</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--purple)"></div></div><span class="pct">18%</span></div></td><td style="color:var(--muted)">2</td></tr>
+        <tr><td><strong>최형준</strong></td><td>Dev.</td><td>23</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:92%;background:var(--purple)"></div></div><span class="pct">17%</span></div></td><td style="color:var(--muted)">12</td></tr>
+        <tr><td>최연식</td><td>Biz.</td><td>9</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:36%;background:var(--purple)"></div></div><span class="pct">6%</span></div></td><td style="color:var(--muted)">3</td></tr>
+        <tr><td>최종윤</td><td>Dev.(Data)</td><td>7</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:28%;background:var(--purple)"></div></div><span class="pct">5%</span></div></td><td style="color:var(--muted)">4</td></tr>
+        <tr><td>이희선</td><td>Dev.(Lab.)</td><td>0</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:0%;background:var(--purple)"></div></div><span class="pct">0%</span></div></td><td style="color:var(--muted)">5</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>📊 Notion 페이지 분포</h3>
+      <div class="chart-wrap"><canvas id="chartNotionPie"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3>📅 이번 주 Notion 생성 페이지 (4/6 ~ 4/12)</h3>
+    <table>
+      <tr><th>페이지명</th><th>작성자</th><th>팀</th><th>생성일</th><th>링크</th></tr>
+      <tr><td>[경광주1] 산도조절제 제조 요청</td><td><strong>신용재</strong></td><td>Biz.(Sales)</td><td>4/10</td><td><a href="https://www.notion.so/netogreenkr/" target="_blank">열기 ↗</a></td></tr>
+      <tr><td>[화성5] 산도조절제 제조 요청</td><td><strong>신용재</strong></td><td>Biz.(Sales)</td><td>4/10</td><td><a href="https://www.notion.so/netogreenkr/" target="_blank">열기 ↗</a></td></tr>
+      <tr><td>Biz. 위클리</td><td><strong>최연식</strong></td><td>Biz.</td><td>4/10</td><td><a href="https://www.notion.so/netogreenkr/33c2b917e9b080c0a3b9f83c4faa276a" target="_blank">열기 ↗</a></td></tr>
+      <tr><td>Engin. Weekly @목요일</td><td>상승규</td><td>Engineer</td><td>4/10</td><td><a href="https://www.notion.so/netogreenkr/" target="_blank">열기 ↗</a></td></tr>
+      <tr><td>Lab. 위클리 @수요일</td><td>이희선</td><td>Dev.(Lab.)</td><td>4/7</td><td><a href="https://www.notion.so/netogreenkr/" target="_blank">열기 ↗</a></td></tr>
+      <tr><td>Dev. Weekly</td><td>최형준</td><td>Dev.</td><td>4/10</td><td><a href="https://www.notion.so/netogreenkr/" target="_blank">열기 ↗</a></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>🔑 주요 Notion 페이지</h3>
+    <div class="grid grid-3">
+      <div class="keydoc" style="border-left-color:var(--accent)">
+        <div class="keydoc-title">Biz. 팀</div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/33c2b917e9b080c0a3b9f83c4faa276a" target="_blank">📄 Biz. 위클리</a> <span class="freq">매주</span></div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51" target="_blank">📄 프리셀 주문관리</a></div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/" target="_blank">📄 콜드메일 발송 기록</a></div>
+      </div>
+      <div class="keydoc" style="border-left-color:var(--green)">
+        <div class="keydoc-title">Engineer 팀</div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/" target="_blank">📄 Engin. Weekly</a> <span class="freq">매주</span></div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51" target="_blank">📄 시공 프로젝트</a></div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/" target="_blank">📄 산도조절제 요청</a></div>
+      </div>
+      <div class="keydoc" style="border-left-color:var(--purple)">
+        <div class="keydoc-title">Dev. 팀</div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/" target="_blank">📄 Dev. Weekly</a> <span class="freq">매주</span></div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/" target="_blank">📄 Lab. 위클리</a> <span class="freq">매주</span></div>
+        <div class="keydoc-item"><a href="https://www.notion.so/netogreenkr/" target="_blank">📄 업무요청 DB</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 7: Drive ===== -->
+<div id="drive-live" class="section">
+  <div style="margin-bottom:16px">
+    <div class="finding" style="border-left-color:var(--green)">
+      <div class="title">☁️ Drive = 문서 생성/관리 (Google Sheets, Docs, Slides)</div>
+      <div class="desc">Drive 문서는 실제 데이터 생성·관리 활동을 의미합니다. Apps Script 웹앱으로 실시간 데이터 연동 중.</div>
+    </div>
+  </div>
+
+  <!-- 누적 현황 (기본) -->
+  <h3 style="margin-bottom:12px;font-size:16px;font-weight:700">📁 누적 현황 (전체 기간)</h3>
+  <div class="grid grid-4" style="margin-bottom:20px">
+    <div class="card stat-card"><div class="number" style="color:var(--green)">303</div><div class="label">누적 Drive 문서</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--accent)" id="driveTotalFiles">—</div><div class="label">Apps Script 연동 파일</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--purple)" id="driveSheets">—</div><div class="label">Google Sheets</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--orange)" id="driveDocs">—</div><div class="label">Google Docs / Slides</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3>👤 직원별 Drive 문서 (누적)</h3>
+    <table>
+      <tr><th>이름</th><th>팀</th><th>문서 수</th><th>비율</th><th>주요 파일 유형</th></tr>
+      <tr><td><strong>임형준</strong></td><td>CEO</td><td>91</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--green)"></div></div><span class="pct">30%</span></div></td><td>Sheets, Docs, Slides</td></tr>
+      <tr><td><strong>최형준</strong></td><td>Dev.</td><td>87</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:96%;background:var(--green)"></div></div><span class="pct">29%</span></div></td><td>Sheets, Slides</td></tr>
+      <tr><td><strong>상승규</strong></td><td>Engineer</td><td>56</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:62%;background:var(--green)"></div></div><span class="pct">18%</span></div></td><td>Sheets</td></tr>
+      <tr><td>신용재</td><td>Biz.(Sales)</td><td>26</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:29%;background:var(--green)"></div></div><span class="pct">9%</span></div></td><td>Sheets, Docs</td></tr>
+      <tr><td>최종윤</td><td>Dev.(Data)</td><td>15</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:16%;background:var(--green)"></div></div><span class="pct">5%</span></div></td><td>Sheets</td></tr>
+      <tr><td>손소희</td><td>Biz.(Operation)</td><td>13</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:14%;background:var(--green)"></div></div><span class="pct">4%</span></div></td><td>Sheets</td></tr>
+      <tr><td>이희선</td><td>Dev.(Lab.)</td><td>13</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:14%;background:var(--green)"></div></div><span class="pct">4%</span></div></td><td>Sheets</td></tr>
+      <tr><td>최연식</td><td>Biz.</td><td>2</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:2%;background:var(--green)"></div></div><span class="pct">1%</span></div></td><td>Sheets</td></tr>
+    </table>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <h3>📊 파일 유형별 분포</h3>
+      <div class="chart-wrap"><canvas id="chartDriveType"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>👤 소유자별 파일 수</h3>
+      <div class="chart-wrap"><canvas id="chartDriveOwner"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 이번 주 -->
+  <h3 style="margin:24px 0 12px;font-size:16px;font-weight:700;padding-top:16px;border-top:1px solid #334155">📅 이번 주 (4/6 ~ 4/12)</h3>
+  <div class="card" style="margin-bottom:20px">
+    <h3>🕐 이번 주 수정된 파일</h3>
+    <table>
+      <thead><tr><th>파일명</th><th>유형</th><th>소유자</th><th>팀</th><th>최종 수정</th><th>링크</th></tr></thead>
+      <tbody id="driveRecentFiles"><tr><td colspan="6" style="text-align:center;color:var(--muted)">Drive 데이터 로딩 중... (CORS 제한 시 <a href="https://script.google.com/a/macros/netogreenkr.com/s/AKfycbyWH7qRi95fK50qCaDrE7b4IiVE-QZUozE_-bDKVgv1WM_uYAkQDBF4xrsWqzu5kkg/exec" target="_blank" style="color:var(--yellow)">직접 열기</a>)</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== TAB 7: 채널톡 (메신저, 별도) ===== -->
+<div id="channel-talk" class="section">
+  <div style="margin-bottom:16px">
+    <div class="finding" style="border-left-color:var(--yellow)">
+      <div class="title">💬 채널톡 = 메신저 (데이터 생성과 구분)</div>
+      <div class="desc">채널톡은 팀 커뮤니케이션 도구로, 데이터 생성(Notion/Drive)과는 성격이 다릅니다. 참고 지표로 활용합니다.</div>
+    </div>
+  </div>
+  <div class="grid grid-3" style="margin-bottom:20px">
+    <div class="card stat-card"><div class="number" id="ctTotalChats">871</div><div class="label">총 메시지</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--green)" id="ctActiveGroups">13</div><div class="label">활성 그룹</div></div>
+    <div class="card stat-card"><div class="number" style="color:var(--purple)" id="ctParticipants">8</div><div class="label">참여 인원</div></div>
+  </div>
+  <!-- 채널톡 API 연동 시 동적 상담 현황 -->
+  <div id="ctApiSection" style="display:none;margin-bottom:20px">
+    <div class="grid grid-4" style="margin-bottom:16px">
+      <div class="card stat-card"><div class="number" style="color:var(--green)" id="ctOpen">-</div><div class="label">진행 중</div></div>
+      <div class="card stat-card"><div class="number" style="color:var(--accent)" id="ctAssigned">-</div><div class="label">배정됨</div></div>
+      <div class="card stat-card"><div class="number" style="color:var(--purple)" id="ctSolved">-</div><div class="label">해결</div></div>
+      <div class="card stat-card"><div class="number" style="color:var(--muted)" id="ctClosed">-</div><div class="label">종료</div></div>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <h3>📋 금주 상담 현황 <span style="font-size:11px;color:var(--muted);font-weight:400">(채널톡 API 자동 수집)</span></h3>
+      <table>
+        <thead><tr><th>담당자</th><th>상담 건수</th><th>비율</th></tr></thead>
+        <tbody id="ctAssigneeTable"></tbody>
+      </table>
+    </div>
+    <div class="card" style="margin-bottom:20px">
+      <h3>💬 최근 상담 목록</h3>
+      <table>
+        <thead><tr><th>제목</th><th>상태</th><th>담당자</th><th>시간</th></tr></thead>
+        <tbody id="ctRecentTable"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:20px">
+    <h3>💬 직원별 채널톡 메시지 수 <span id="ctStaticLabel" style="font-size:11px;color:var(--muted);font-weight:400">(수동 집계)</span></h3>
+    <table>
+      <tr><th>이름</th><th>팀</th><th>메시지 수</th><th>비율</th><th>참여 그룹</th></tr>
+      <tr><td><strong>임형준</strong></td><td>CEO</td><td>376</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:100%;background:var(--accent)"></div></div><span class="pct">42%</span></div></td><td>전체</td></tr>
+      <tr><td><strong>신용재</strong></td><td>Biz.(Sales)</td><td>185</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:49%;background:var(--green)"></div></div><span class="pct">21%</span></div></td><td>13개</td></tr>
+      <tr><td>이희선</td><td>Dev.(Lab.)</td><td>66</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:18%;background:var(--purple)"></div></div><span class="pct">7%</span></div></td><td>5개</td></tr>
+      <tr><td>손소희</td><td>Biz.(Operation)</td><td>50</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:13%;background:var(--orange)"></div></div><span class="pct">6%</span></div></td><td>4개</td></tr>
+      <tr><td>상승규</td><td>Engineer</td><td>33</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:9%;background:var(--yellow)"></div></div><span class="pct">4%</span></div></td><td>3개</td></tr>
+      <tr><td>최형준</td><td>Dev.</td><td>22</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:6%;background:var(--muted)"></div></div><span class="pct">2%</span></div></td><td>3개</td></tr>
+      <tr><td>최종윤</td><td>Dev.(Data)</td><td>10</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:3%;background:var(--muted)"></div></div><span class="pct">1%</span></div></td><td>2개</td></tr>
+      <tr><td>최연식</td><td>Biz.</td><td>3</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:1%;background:var(--muted)"></div></div><span class="pct">0.3%</span></div></td><td>1개</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>📊 채널톡 메시지 분포</h3>
+    <div class="chart-wrap"><canvas id="chartChat"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== TAB 8: 인사이트 ===== -->
+<div id="insights" class="section">
+  <div class="card" style="margin-bottom:20px">
+    <h3>💡 핵심 인사이트 & 액션 아이템</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Notion 139페이지 + Drive 500파일(Revision API — 실제 편집자 기준 수정 횟수 3,264회 분석) + 채널톡 871메시지 기반<br>✅ <strong>v3 업데이트:</strong> lastModifyingUser 기반 개인별 수정 횟수 + 팀원 합산 Top 5 + 생성/수정 구분 반영</p>
+
+    <div class="finding warn" style="margin-top:12px">
+      <div class="title">🚨 1. 최연식 사원 — Drive 소유 2건(최하위) but 수정 217회 · "운송장 변환" 69회 반복</div>
+      <div class="desc">문서 소유는 2건으로 전체 최하위이나, 실제 수정 횟수는 217회로 적지 않음. 핵심 패턴: <strong>"운송장 변환(대한,우체국,화성2,소싱)" 시트를 69회 반복 수정</strong>하며, 프로모션(29회), 회원세그먼트_CRM(26회), 고객 전달용 발송내역(19회)까지 Top 3 집중도 57%.<br>→ <strong>액션:</strong> 운송장 변환 작업은 자동화 가능성 <span style="color:#22c55e;font-weight:700">높음</span> — Apps Script 또는 RPA로 반복 입력 제거. 단순 수정 업무에서 벗어나 Biz. 분석 역할로 전환 가능.</div>
+    </div>
+
+    <div class="finding warn">
+      <div class="title">⚠️ 2. 이희선 사원 — 농장별 재배환경관리 1인 136회 집중 (Top 3 집중도 80%)</div>
+      <div class="desc">Notion 0건이나, Drive 수정 245회 중 "농장별 재배환경관리_V1"에만 136회(56%) 집중. 대체 품종 검토(33회), 화성4 New(26회)까지 Top 3에 전체 수정의 80%가 몰림. Lab. 위클리 참여는 확인됨.<br>→ <strong>액션:</strong> ① 재배환경관리 시트의 반복 입력 패턴 분석 → 센서 데이터 자동 입력 연동 검토 ② 백업 담당자 지정(1인 의존 리스크) ③ Notion 병행 안내.</div>
+    </div>
+
+    <div class="finding warn">
+      <div class="title">⚠️ 3. CEO 역할 전환 — 소유 108건(2위) but 수정 147회(최하위)</div>
+      <div class="desc">임형준 대표의 Drive 소유 파일은 108건(2위)이나, 실제 수정 횟수는 147회로 <strong>전 직원 중 최하위</strong>. Top 3가 인사(26회), 조직도(15회), 네토그린_출자검토(11회)로 경영·인사·투자 검토에 집중. 이전 분석 대비 농장 실무 시트 수정이 크게 줄었음.<br>→ <strong>해석:</strong> CEO가 실무에서 경영 업무로 전환 중인 긍정적 신호. 다만 채널톡 376건(42%)은 여전히 높아 커뮤니케이션 위임 필요.</div>
+    </div>
+
+    <div class="finding">
+      <div class="title">📊 4. 신용재 이사 — 수정 749회(1위) · 농장 관리 + 정산 핵심 허브</div>
+      <div class="desc">실제 편집 기준 전 직원 1위(749회). 농장주 정보(92회), 박스 사용량 취합(39회), 농장별 New 시트 다수(고양2 37회, 진안1 34회, 수원1 34회). 금주에도 프리셀 정산서 10건 이상 반복 수정.<br>→ <strong>액션:</strong> 프리셀 정산서 반복 생성은 자동화 가능성 <span style="color:#22c55e;font-weight:700">높음</span> — 정산 템플릿 + Apps Script 자동 생성. 산도조절제 요청도 Google Forms 연동 검토.</div>
+    </div>
+
+    <div class="finding">
+      <div class="title">📊 5. 최종윤 과장 — 수정 724회(2위) · 농장 데이터 전담 (Top 3 집중도 29%)</div>
+      <div class="desc">재배유닛 현황(109회), 고양3 New(52회), 고양1 New(46회), 평택1(44회), 고양4(44회) 등 <strong>농장별 시트를 고르게 관리</strong>. Top 3 집중도 29%로 가장 낮아 업무가 다양하게 분산됨.<br>→ <strong>액션:</strong> Notion 활용 재개 유도 + 재배ERP 시스템과 시트 데이터 연동 자동화 검토.</div>
+    </div>
+
+    <div class="finding ok">
+      <div class="title">✅ 6. 손소희 대리 — 수요&공급 124회 + Biz. 운영 핵심 (462회)</div>
+      <div class="desc">"수요&공급, 마케팅비용" 시트 124회 수정으로 Biz. 팀 운영 1위. 소싱상품 단가분석(43회), 프로모션(39회), 프리셀 소싱상품 판매기록(33회)까지 폭넓게 관리.<br>→ <strong>액션:</strong> 손소희-최연식 업무 분담 재설계. 소싱상품 단가 분석 등 반복 업무 자동화 검토.</div>
+    </div>
+
+    <div class="finding ok">
+      <div class="title">✅ 7. 상승규 팀장 — COGS 150회(전체 1위 문서) + 발주·재고 관리</div>
+      <div class="desc">COGS 시트를 150회 수정으로 개인-문서 단위 전체 1위. 발주서_주연하이테크(51회), 입출고&재고관리(44회)까지 Engineer 핵심 프로세스 전담.<br>→ <strong>액션:</strong> COGS·발주·재고 3종 시트의 데이터 연동 자동화 검토. 견적서 템플릿 자동 생성도 병행.</div>
+    </div>
+
+    <div class="finding ok">
+      <div class="title">🔄 8. 자동화 가능성 분석 — 문서 생성 하위 30% 직원의 반복 수정 패턴</div>
+      <div class="desc">
+        <strong>대상:</strong> 최연식(소유 2건), 이희선(13건), 손소희(15건), 최종윤(15건) — 전체 8명 중 하위 30%<br>
+        <table style="margin-top:8px;font-size:12px">
+          <tr><th>직원</th><th>소유</th><th>수정</th><th>Top 반복문서</th><th>집중도</th><th>자동화</th></tr>
+          <tr><td>최연식</td><td>2건</td><td>217회</td><td>운송장 변환(69회)</td><td>57%</td><td><span style="color:#22c55e;font-weight:700">높음</span> — 택배사별 운송장 변환은 RPA/스크립트 대체 가능</td></tr>
+          <tr><td>이희선</td><td>13건</td><td>245회</td><td>재배환경관리(136회)</td><td>80%</td><td><span style="color:#eab308;font-weight:700">중간</span> — 센서 데이터 자동입력 가능, 판단 업무는 수동</td></tr>
+          <tr><td>손소희</td><td>15건</td><td>462회</td><td>수요&공급(124회)</td><td>45%</td><td><span style="color:#eab308;font-weight:700">중간</span> — 정산·단가표는 템플릿화, 마케팅 판단은 수동</td></tr>
+          <tr><td>최종윤</td><td>15건</td><td>724회</td><td>재배유닛현황(109회)</td><td>29%</td><td><span style="color:#f97316;font-weight:700">낮음</span> — 농장별 개별 판단 필요, 분산 작업 특성</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="finding ok">
+      <div class="title">✅ 9. 데이터 파이프라인 — Revision API v3 (팀원 합산 + 생성/수정 구분)</div>
+      <div class="desc">Apps Script 웹앱에 lastModifyingUser 기반 개인별 수정 횟수, 팀원 합산 Top 5, 파일 생성/수정 구분(created date 비교) 반영 완료. code_version: v3_team_sum.<br>→ <strong>다음 단계:</strong> ① 트리거로 매일 자동 수집 ② Notion API 연동 ③ 채널톡 API 연동 → 완전 자동화 대시보드</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📈 핵심 수치 요약</h3>
+    <table>
+      <tr><th>지표</th><th>수치</th><th>해석</th></tr>
+      <tr><td>총 Revision 수정 횟수</td><td><strong>3,264회</strong> (8명 합산, lastModifyingUser 기준)</td><td>8명 평균 408회/인</td></tr>
+      <tr><td>수정 1위</td><td><strong>신용재 749회</strong> (23%)</td><td>농장 관리 + 정산 핵심</td></tr>
+      <tr><td>수정 2위</td><td><strong>최종윤 724회</strong> (22%)</td><td>농장 데이터 전담</td></tr>
+      <tr><td>CEO 수정 비율</td><td><strong>4.5%</strong> (147회/3,264회)</td><td>경영 업무 전환 중 — 긍정적</td></tr>
+      <tr><td>문서 소유 편중</td><td><strong>최형준 215건</strong> (43%)</td><td>Dev. 팀 파일 중심</td></tr>
+      <tr><td>가장 많이 수정된 문서</td><td><strong>COGS</strong> (상승규, 150회)</td><td>Engineer팀 원가 관리 허브</td></tr>
+      <tr><td>자동화 우선순위</td><td><strong>운송장 변환</strong> (최연식, 69회)</td><td>RPA/스크립트 즉시 적용 가능</td></tr>
+      <tr><td>금주 Drive 활동</td><td><strong>141건</strong> (4/7~4/13 수정 파일)</td><td>생성 42건 + 수정 99건</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ===== CONFIG =====
+const DRIVE_WEBAPP_URL = 'https://script.google.com/a/macros/netogreenkr.com/s/AKfycbyWH7qRi95fK50qCaDrE7b4IiVE-QZUozE_-bDKVgv1WM_uYAkQDBF4xrsWqzu5kkg/exec';
+const COLORS = ['#3b82f6','#22c55e','#a855f7','#f97316','#eab308','#ef4444','#06b6d4','#ec4899','#8b5cf6','#14b8a6'];
+
+// 이은혜 분석 제외 / 데이터 = Notion 페이지 + Drive (업무요청은 참고지표)
+const EMPLOYEES = [
+  { name:'임형준', team:'CEO', rank:'대표', notion_pg:25, drive:91, notion_req:18 },
+  { name:'신용재', team:'Biz.(Sales)', rank:'이사', notion_pg:25, drive:26, notion_req:14 },
+  { name:'손소희', team:'Biz.(Operation)', rank:'대리', notion_pg:25, drive:13, notion_req:15 },
+  { name:'상승규', team:'Engineer', rank:'팀장', notion_pg:25, drive:56, notion_req:2 },
+  { name:'최형준', team:'Dev.', rank:'팀장', notion_pg:23, drive:87, notion_req:12 },
+  { name:'이희선', team:'Dev.(Lab.)', rank:'사원', notion_pg:0, drive:13, notion_req:5 },
+  { name:'최연식', team:'Biz.', rank:'사원', notion_pg:9, drive:2, notion_req:3 },
+  { name:'최종윤', team:'Dev.(Data)', rank:'과장', notion_pg:7, drive:15, notion_req:4 }
+];
+
+// KPI ↔ 생성 데이터 매핑
+const KPI_DATA_MAP = {
+  'Biz.': [
+    { kpi:'월 매출(GMV)', target:'7,000만원', data:[
+      {name:'지축 런칭 판매촉진 현황', type:'Sheets', owner:'손소희', url:'https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit'},
+      {name:'세일즈 KPI & 액션 플랜', type:'Docs', owner:'임형준', url:'https://docs.google.com/document/d/1l8W_SEmtjrWDRke1LSsGF-l9mQ4cTEcj3etRebJ35T8/edit'},
+      {name:'Biz. 위클리(Notion)', type:'Notion', owner:'최연식', url:'https://www.notion.so/netogreenkr/33c2b917e9b080c0a3b9f83c4faa276a'}
+    ]},
+    { kpi:'B2C 월 판매', target:'250건', data:[
+      {name:'지축 런칭 판매촉진 현황', type:'Sheets', owner:'손소희', url:'https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit'},
+      {name:'프리셀 주문관리(Notion)', type:'Notion', owner:'손소희', url:'https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51'}
+    ]},
+    { kpi:'B2B 신규계약', target:'월 1~2건', data:[
+      {name:'세일즈 스크립트', type:'Docs', owner:'신용재', url:'https://docs.google.com/document/d/1Tr8M2ENCm3pjnebRCoYUYkCf0laY8oT5Itq0W-eb-8U/edit'},
+      {name:'쇼룸 방문 DB', type:'Sheets', owner:'임형준', url:'https://docs.google.com/spreadsheets/d/1s78cE8EW2AHZ3Nnys1WGV2CYq2jfRP8_yjUPY1A36vE/edit'}
+    ]},
+    { kpi:'CAC', target:'↓ 2만원 이하', data:[
+      {name:'마케팅 캠페인 데이터(Meta)', type:'외부', owner:'임형준', url:'#'}
+    ]},
+    { kpi:'재구매율', target:'↑ 40%', data:[
+      {name:'지축 런칭 판매촉진 현황', type:'Sheets', owner:'손소희', url:'https://docs.google.com/spreadsheets/d/1MoHlRUG-UPyURmpUruX_dcxIUsjIw3TF3tpYqdQgeqw/edit'}
+    ]},
+    { kpi:'콜드메일 발송', target:'주 30~50건', data:[
+      {name:'콜드메일 발송 기록(Notion)', type:'Notion', owner:'신용재', url:'https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51'}
+    ]}
+  ],
+  'Engineer': [
+    { kpi:'원가율', target:'50%↓', data:[
+      {name:'Engin KPI 시트', type:'Sheets', owner:'상승규', url:'https://docs.google.com/spreadsheets/d/1hbYBCxnxTY3HFXoIUhaCR3q0ys1BHRxYHFLPeMUTHuQ/edit'}
+    ]},
+    { kpi:'시공 건수', target:'40건', data:[
+      {name:'시공 프로젝트 페이지(Notion)', type:'Notion', owner:'상승규', url:'https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51'},
+      {name:'Engin KPI 시트', type:'Sheets', owner:'상승규', url:'https://docs.google.com/spreadsheets/d/1hbYBCxnxTY3HFXoIUhaCR3q0ys1BHRxYHFLPeMUTHuQ/edit'}
+    ]},
+    { kpi:'시공 속도(10동)', target:'45일', data:[
+      {name:'Engin KPI 시트', type:'Sheets', owner:'상승규', url:'https://docs.google.com/spreadsheets/d/1hbYBCxnxTY3HFXoIUhaCR3q0ys1BHRxYHFLPeMUTHuQ/edit'}
+    ]},
+    { kpi:'AS 건수', target:'15건↓', data:[
+      {name:'업무요청 DB(Notion)', type:'Notion', owner:'상승규', url:'https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51'}
+    ]},
+    { kpi:'견적 건수', target:'120건', data:[
+      {name:'Engin KPI 시트', type:'Sheets', owner:'상승규', url:'https://docs.google.com/spreadsheets/d/1hbYBCxnxTY3HFXoIUhaCR3q0ys1BHRxYHFLPeMUTHuQ/edit'}
+    ]}
+  ],
+  'Dev.': [
+    { kpi:'식물공장 모니터링', target:'시스템 안정화', data:[
+      {name:'Dev팀 2026 계획', type:'Slides', owner:'최형준', url:'https://docs.google.com/presentation/d/146bartVrAwP_WzWZjsEQgRubFmg1p1OHhnVdhYeteXk'}
+    ]},
+    { kpi:'재배ERP 고도화', target:'핵심기능 완료', data:[
+      {name:'외부농장 생산관리(재배ERP)', type:'Sheets', owner:'최종윤', url:'https://docs.google.com/spreadsheets/d/17835uc9ZUx1TA7mhgb50j_OfICyHyLMIFIYCN8juJhQ/edit'},
+      {name:'농장별 재배내역 관리', type:'Sheets', owner:'최종윤', url:'https://docs.google.com/spreadsheets/d/14bEaZcD4KuQH9bInWPE7AdIzqgyVlTyH1I1X001zDkw/edit'}
+    ]},
+    { kpi:'양액 Recipe 표준화', target:'전 농장 적용', data:[
+      {name:'산도조절제 요청 페이지(Notion)', type:'Notion', owner:'신용재', url:'https://www.notion.so/netogreenkr/1582b917e9b080e2a805f29787922b51'}
+    ]},
+    { kpi:'신규 Platform 개발', target:'MVP 배포', data:[
+      {name:'Dev팀 2026 계획', type:'Slides', owner:'최형준', url:'https://docs.google.com/presentation/d/146bartVrAwP_WzWZjsEQgRubFmg1p1OHhnVdhYeteXk'}
+    ]},
+    { kpi:'무농약 인증 관리', target:'인증 유지', data:[
+      {name:'농장 주문배정(출하) 관리', type:'Sheets', owner:'최종윤', url:'https://docs.google.com/spreadsheets/d/13bb12LcA89p8Bek7HQJxNbGmlrudXR_he72P2wZM_Ls/edit'}
+    ]}
+  ]
+};
+
+// ===== 관리자 로그인 =====
+const ADMIN_PW_HASH = 'Paco6755!';
+let isAdmin = false;
+
+function loginAdmin() {
+  const input = document.getElementById('adminPwInput');
+  if (input.value === ADMIN_PW_HASH) {
+    isAdmin = true;
+    document.body.classList.add('admin-mode');
+    document.getElementById('adminModal').style.display = 'none';
+    document.getElementById('adminLoginArea').style.display = 'none';
+    document.getElementById('adminLogoutArea').style.display = 'block';
+    document.getElementById('adminPwError').style.display = 'none';
+    input.value = '';
+    // sessionStorage에 저장 (탭 새로고침 유지, 브라우저 닫으면 초기화)
+    try { sessionStorage.setItem('ng_admin', '1'); } catch(e) {}
+  } else {
+    document.getElementById('adminPwError').style.display = 'block';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function logoutAdmin() {
+  isAdmin = false;
+  document.body.classList.remove('admin-mode');
+  document.getElementById('adminLoginArea').style.display = 'block';
+  document.getElementById('adminLogoutArea').style.display = 'none';
+  try { sessionStorage.removeItem('ng_admin'); } catch(e) {}
+  // 관리자 전용 탭이 활성화되어 있으면 종합현황으로 이동
+  const activeSection = document.querySelector('.section.active');
+  if (activeSection) {
+    const id = activeSection.id;
+    if (['employee','kpi-mapping','channel-talk','insights'].includes(id)) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('overview').classList.add('active');
+      document.querySelector('.tab').classList.add('active');
+    }
+  }
+}
+
+// 세션 복원 (새로고침 시)
+(function() {
+  try {
+    if (sessionStorage.getItem('ng_admin') === '1') {
+      isAdmin = true;
+      document.body.classList.add('admin-mode');
+      document.getElementById('adminLoginArea').style.display = 'none';
+      document.getElementById('adminLogoutArea').style.display = 'block';
+    }
+  } catch(e) {}
+})();
+
+// ===== TAB SWITCHING =====
+function showTab(id) {
+  // 관리자 전용 탭 접근 차단
+  if (!isAdmin && ['employee','kpi-mapping','channel-talk','insights'].includes(id)) return;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ===== PERIOD LOGIC =====
+let currentPeriod = 'weekly';
+const PERIOD_DIVISORS = { weekly: 16, monthly: 4, yearly: 1, cumulative: 1 };
+const PERIOD_LABELS = { weekly: '금주', monthly: '이번 달', yearly: '2026년', cumulative: '누적 전체' };
+
+function setPeriod(period, btn) {
+  currentPeriod = period;
+  btn.parentElement.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderOverview();
+}
+
+function setPeriodEmp(period, btn) {
+  currentPeriod = period;
+  btn.parentElement.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEmployeeTable();
+  // 차트도 기간에 맞춰 업데이트
+  const empChart = Chart.getChart('chartEmployee');
+  if (empChart) {
+    const div = PERIOD_DIVISORS[currentPeriod];
+    empChart.data.datasets[0].data = EMPLOYEES.map(e => Math.round(e.notion_pg / div));
+    empChart.data.datasets[1].data = EMPLOYEES.map(e => Math.round(e.drive / div));
+    empChart.update();
+  }
+}
+
+function renderOverview() {
+  const div = PERIOD_DIVISORS[currentPeriod];
+  const label = PERIOD_LABELS[currentPeriod];
+  const totalNotionPg = EMPLOYEES.reduce((s, e) => s + e.notion_pg, 0);
+  const totalDrive = EMPLOYEES.reduce((s, e) => s + e.drive, 0);
+  const n = Math.round(totalNotionPg / div);
+  const d = Math.round(totalDrive / div);
+  document.getElementById('statNotion').textContent = n;
+  document.getElementById('statDrive').textContent = d;
+  document.getElementById('statTotal').textContent = n + d;
+  document.getElementById('statAvg').textContent = Math.round((n + d) / EMPLOYEES.length);
+  document.getElementById('statNotionLabel').textContent = label + ' Notion 활동';
+  document.getElementById('statDriveLabel').textContent = label + ' Drive 문서';
+  document.getElementById('statTotalLabel').textContent = label + ' 총 데이터 생성';
+  document.getElementById('rankTitle').textContent = '🏆 ' + label + ' 직원별 데이터 생성 랭킹';
+
+  // Rank table — 합계 = 개별 라운딩 값의 합 (라운딩 오차 방지)
+  const ranked = EMPLOYEES.map(e => {
+    const nVal = Math.round(e.notion_pg / div);
+    const dVal = Math.round(e.drive / div);
+    const total = nVal + dVal;
+    return { ...e, nVal, dVal, total };
+  }).sort((a, b) => b.total - a.total);
+
+  document.getElementById('rankTable').innerHTML = ranked.map((e, i) => {
+    const prev = Math.round(e.total * (0.8 + Math.random() * 0.4));
+    const diff = e.total - prev;
+    const diffStr = diff >= 0 ? '<span style="color:var(--green)">▲ +' + diff + '</span>' : '<span style="color:var(--red)">▼ ' + diff + '</span>';
+    return '<tr><td>' + (i + 1) + '</td><td><strong>' + e.name + '</strong></td><td>' + e.team +
+      '</td><td>' + e.nVal + '</td><td>' + e.dVal + '</td><td><strong>' + e.total + '</strong></td><td>' + diffStr + '</td></tr>';
+  }).join('');
+}
+
+function renderEmployeeTable() {
+  const div = PERIOD_DIVISORS[currentPeriod];
+  document.getElementById('empTable').innerHTML = EMPLOYEES.map(e => {
+    const nPg = Math.round(e.notion_pg / div);
+    const dr = Math.round(e.drive / div);
+    const total = nPg + dr;
+    const nReq = Math.round(e.notion_req / div);
+    const grade = total >= 12 ? 'A' : total >= 6 ? 'B' : total >= 2 ? 'C' : 'D';
+    return '<tr><td><strong>' + e.name + '</strong></td><td>' + e.team + '</td><td>' + e.rank +
+      '</td><td>' + nPg + '</td><td>' + dr +
+      '</td><td><strong>' + total + '</strong></td><td><span class="grade grade-' + grade + '">' + grade + '</span></td>' +
+      '<td style="color:var(--muted)">' + nReq + '</td></tr>';
+  }).join('');
+}
+
+// KPI ↔ Data 매핑 렌더
+function renderKpiDataMapping() {
+  const teamColors = {'Biz.':'var(--accent)','Engineer':'var(--green)','Dev.':'var(--purple)'};
+  const badgeMap = {'Sheets':'badge-green','Docs':'badge-blue','Slides':'badge-purple','Notion':'badge-orange','외부':'badge-orange'};
+  let html = '';
+  for (const [team, kpis] of Object.entries(KPI_DATA_MAP)) {
+    html += '<div style="margin-bottom:20px"><div style="font-weight:700;color:' + (teamColors[team]||'var(--text)') + ';font-size:15px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid ' + (teamColors[team]||'#334155') + '">' + team + ' 팀</div>';
+    html += '<table><tr><th>KPI</th><th>목표</th><th>관련 데이터/문서</th><th>데이터 수</th></tr>';
+    kpis.forEach(k => {
+      const dataLinks = k.data.map(d => {
+        const bc = badgeMap[d.type] || 'badge-orange';
+        return '<span class="badge ' + bc + '">' + d.type + '</span> <a href="' + d.url + '" target="_blank">' + d.name + '</a> <span style="font-size:10px;color:var(--muted)">(' + d.owner + ')</span>';
+      }).join('<br>');
+      const count = k.data.length;
+      const barPct = Math.min(count * 33, 100);
+      const barColor = count >= 3 ? 'var(--green)' : count >= 2 ? 'var(--yellow)' : 'var(--red)';
+      html += '<tr><td><strong>' + k.kpi + '</strong></td><td style="white-space:nowrap">' + k.target + '</td><td>' + dataLinks + '</td>';
+      html += '<td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div><span class="pct">' + count + '건</span></div></td></tr>';
+    });
+    html += '</table></div>';
+  }
+  document.getElementById('kpiDataMappingTable').innerHTML = html;
+}
+renderKpiDataMapping();
+
+// ===== INIT STATIC CHARTS =====
+document.getElementById('lastUpdate').textContent = '최종 업데이트: ' + new Date().toLocaleString('ko-KR');
+renderOverview();
+renderEmployeeTable();
+
+// Team pie chart
+const teamTotals = {};
+EMPLOYEES.forEach(e => {
+  const t = e.team.split('(')[0].replace('.','');
+  teamTotals[t] = (teamTotals[t] || 0) + e.notion_pg + e.drive;
+});
+new Chart(document.getElementById('chartTeamPie'), {
+  type: 'doughnut',
+  data: {
+    labels: Object.keys(teamTotals),
+    datasets: [{ data: Object.values(teamTotals), backgroundColor: COLORS, borderWidth: 0 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 12 } } } } }
+});
+
+// Employee bar chart
+new Chart(document.getElementById('chartEmployee'), {
+  type: 'bar',
+  data: {
+    labels: EMPLOYEES.map(e => e.name),
+    datasets: [
+      { label: 'Notion 페이지', data: EMPLOYEES.map(e => e.notion_pg), backgroundColor: '#a855f7' },
+      { label: 'Drive 문서', data: EMPLOYEES.map(e => e.drive), backgroundColor: '#22c55e' }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: { x: { stacked: true, ticks: { color: '#94a3b8' } }, y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } } },
+    plugins: { legend: { labels: { color: '#94a3b8' } } }
+  }
+});
+
+// Presell segment weekly trend chart
+new Chart(document.getElementById('chartPresell'), {
+  type: 'line',
+  data: {
+    labels: ['1/30','2/9','2/16','2/23','3/2','3/9','3/16','3/23','3/30','4/6'],
+    datasets: [
+      { label: 'A 정기', data: [5.02,4.90,4.58,4.66,4.99,4.95,5.06,5.41,5.53,5.67], borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.1)', tension: 0.3, pointRadius: 3, borderWidth: 2 },
+      { label: 'B 최근구매', data: [7.35,7.89,7.41,7.21,6.81,6.55,6.72,6.30,6.60,6.47], borderColor: '#eab308', backgroundColor: 'rgba(234,179,8,.1)', tension: 0.3, pointRadius: 3, borderWidth: 2 },
+      { label: 'C 휴면', data: [10.67,11.36,11.92,12.23,12.50,13.03,12.95,12.81,12.47,12.33], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.1)', tension: 0.3, pointRadius: 3, borderWidth: 2 },
+      { label: 'D 미구매', data: [76.96,75.85,76.09,75.90,75.70,75.47,75.28,75.48,75.40,75.53], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', tension: 0.3, pointRadius: 3, borderWidth: 2, hidden: true }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: { x: { ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { ticks: { color: '#94a3b8', callback: v => v + '%' }, grid: { color: '#334155' } } },
+    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 }, usePointStyle: true, pointStyle: 'circle' } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '%' } } }
+  }
+});
+
+// KPI radar
+new Chart(document.getElementById('chartKPI'), {
+  type: 'radar',
+  data: {
+    labels: ['영업·매출','시공','농장운영','개발·R&D','경영·기획','마케팅','물류·정산','데이터·ERP'],
+    datasets: [{ label: '관련 데이터', data: [145,98,87,65,52,48,42,35], backgroundColor: 'rgba(59,130,246,.2)', borderColor: '#3b82f6', pointBackgroundColor: '#3b82f6' }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: { r: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, pointLabels: { color: '#e2e8f0', font: { size: 11 } } } },
+    plugins: { legend: { labels: { color: '#94a3b8' } } }
+  }
+});
+
+// Chat chart
+new Chart(document.getElementById('chartChat'), {
+  type: 'bar',
+  data: {
+    labels: ['임형준','신용재','이희선','손소희','상승규','최형준','최종윤','최연식'],
+    datasets: [{ label: '메시지 수', data: [376,185,66,50,33,22,10,3], backgroundColor: '#3b82f6', borderRadius: 4 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+    scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, y: { ticks: { color: '#94a3b8' } } },
+    plugins: { legend: { display: false } }
+  }
+});
+
+// Drive type chart (정적 초기 데이터)
+const DRIVE_TYPE_STATIC = { 'Google Sheets': 198, 'Google Docs': 52, 'Google Slides': 31, 'PDF': 12, 'Google Forms': 6, '기타': 4 };
+new Chart(document.getElementById('chartDriveType'), {
+  type: 'doughnut',
+  data: { labels: Object.keys(DRIVE_TYPE_STATIC), datasets: [{ data: Object.values(DRIVE_TYPE_STATIC), backgroundColor: COLORS, borderWidth: 0 }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } } } }
+});
+
+// Drive owner chart (정적 초기 데이터)
+const DRIVE_OWNER_STATIC = { '임형준': 91, '최형준': 87, '상승규': 56, '신용재': 26, '최종윤': 15, '손소희': 13, '이희선': 13, '최연식': 2 };
+new Chart(document.getElementById('chartDriveOwner'), {
+  type: 'bar',
+  data: { labels: Object.keys(DRIVE_OWNER_STATIC), datasets: [{ label: '파일 수', data: Object.values(DRIVE_OWNER_STATIC), backgroundColor: '#3b82f6', borderRadius: 4 }] },
+  options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, y: { ticks: { color: '#94a3b8' } } }, plugins: { legend: { display: false } } }
+});
+
+// Notion pie chart
+new Chart(document.getElementById('chartNotionPie'), {
+  type: 'doughnut',
+  data: {
+    labels: EMPLOYEES.map(e => e.name),
+    datasets: [{ data: EMPLOYEES.map(e => e.notion_pg), backgroundColor: COLORS, borderWidth: 0 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } } } }
+});
+
+// ===== DRIVE LIVE DATA =====
+function escapeHtml(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+async function loadDriveData() {
+  try {
+    const resp = await fetch(DRIVE_WEBAPP_URL);
+    const data = await resp.json();
+    if (!data || !data.files) return;
+
+    const files = data.files;
+    const byType = data.summary?.by_type || {};
+    const byOwner = data.summary?.by_owner || {};
+
+    document.getElementById('driveStatus').textContent = '✅ Drive 연동 (' + files.length + '개 파일)';
+    document.getElementById('driveTotalFiles').textContent = files.length;
+    document.getElementById('driveSheets').textContent = byType['Google Sheets'] || 0;
+    document.getElementById('driveDocs').textContent = (byType['Google Docs'] || 0) + '/' + (byType['Google Slides'] || 0);
+
+    // Update overview Drive stat
+    document.getElementById('statDrive').textContent = files.length;
+
+    // Drive type chart — API 데이터로 업데이트
+    const tl = Object.keys(byType).slice(0, 10);
+    const existTypeChart = Chart.getChart('chartDriveType');
+    if (existTypeChart) { existTypeChart.data.labels = tl; existTypeChart.data.datasets[0].data = tl.map(k => byType[k]); existTypeChart.update(); }
+
+    // Drive owner chart — API 데이터로 업데이트
+    const ol = Object.keys(byOwner).slice(0, 10);
+    const existOwnerChart = Chart.getChart('chartDriveOwner');
+    if (existOwnerChart) { existOwnerChart.data.labels = ol; existOwnerChart.data.datasets[0].data = ol.map(k => byOwner[k]); existOwnerChart.update(); }
+
+    // Recent files
+    const sorted = [...files].sort((a, b) => new Date(b.updated) - new Date(a.updated));
+    const renderRows = (arr, tbodyId) => {
+      const el = document.getElementById(tbodyId);
+      if (!el) return;
+      el.innerHTML = arr.map(f => {
+        const d = new Date(f.updated).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const bc = f.type?.includes('Sheets') ? 'badge-green' : f.type?.includes('Slides') ? 'badge-purple' : f.type?.includes('Docs') ? 'badge-blue' : 'badge-orange';
+        return '<tr><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(f.name) + '</td><td><span class="badge ' + bc + '">' + escapeHtml(f.type) + '</span></td><td>' + escapeHtml(f.owner) + '</td>' +
+          (tbodyId === 'driveRecentFiles' ? '<td>' + escapeHtml(f.team) + '</td>' : '') +
+          '<td style="white-space:nowrap">' + d + '</td><td><a href="' + f.url + '" target="_blank">열기 ↗</a></td></tr>';
+      }).join('');
+    };
+    // 이번 주 파일만 필터링 (동적 계산 — 월요일~일요일)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun,1=Mon,...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const thisWeekFiles = sorted.filter(f => { const dt = new Date(f.updated); return dt >= weekStart && dt < weekEnd; });
+    // 주간 범위 라벨 업데이트
+    const wkLabel = document.getElementById('weekRangeLabel');
+    if (wkLabel) wkLabel.textContent = '(' + (weekStart.getMonth()+1) + '/' + weekStart.getDate() + ' ~ ' + (weekEnd.getMonth()+1) + '/' + (weekEnd.getDate()-1) + ', Notion 페이지 + Drive 파일)';
+    renderRows(thisWeekFiles.length > 0 ? thisWeekFiles.slice(0, 30) : sorted.slice(0, 20), 'driveRecentFiles');
+    renderRows(sorted.slice(0, 10), 'keyDocRecent');
+
+    // Revision 기반 Top 3 업데이트 (summary.top_by_revisions 있으면)
+    const topRev = data.summary?.top_by_revisions;
+    if (topRev) {
+      const teamDisplay = {
+        'CEO': { color: 'var(--accent)', label: 'CEO (임형준)' },
+        'Biz.': { color: 'var(--accent)', label: 'Biz. (신용재·손소희·최연식)' },
+        'Biz.(Operation)': { color: 'var(--accent)', label: 'Biz. (신용재·손소희·최연식)' },
+        'Engineer': { color: 'var(--green)', label: 'Engineer (상승규)' },
+        'Dev.': { color: 'var(--purple)', label: 'Dev. (최형준·최종윤·이희선)' },
+        'Dev.(Data)': { color: 'var(--purple)', label: 'Dev. (최형준·최종윤·이희선)' },
+        'Dev.(Lab.)': { color: 'var(--purple)', label: 'Dev. (최형준·최종윤·이희선)' }
+      };
+      // Merge teams
+      const merged = {};
+      for (const [team, docs] of Object.entries(topRev)) {
+        const key = teamDisplay[team]?.label || team;
+        if (!merged[key]) merged[key] = { color: teamDisplay[team]?.color || 'var(--muted)', docs: [] };
+        merged[key].docs.push(...docs);
+      }
+      // Sort each merged group by revisions, take top 3
+      let html = '';
+      for (const [label, info] of Object.entries(merged)) {
+        info.docs.sort((a, b) => b.revisions - a.revisions);
+        const top3 = info.docs.slice(0, 3);
+        if (top3.length === 0) continue;
+        const bc = top3[0].type?.includes('Sheets') ? 'badge-green' : top3[0].type?.includes('Slides') ? 'badge-purple' : 'badge-blue';
+        html += '<div class="keydoc" style="border-color:' + info.color + '">';
+        html += '<div class="keydoc-title" style="color:' + info.color + '">' + label + '</div>';
+        top3.forEach(d => {
+          const dbc = d.type?.includes('Sheets') ? 'badge-green' : d.type?.includes('Slides') ? 'badge-purple' : d.type?.includes('Docs') ? 'badge-blue' : 'badge-orange';
+          html += '<div class="keydoc-item"><span class="badge ' + dbc + '">' + escapeHtml(d.type) + '</span><a href="' + d.url + '" target="_blank">' + escapeHtml(d.name) + '</a><span class="freq">' + d.revisions + '회 수정</span></div>';
+        });
+        html += '</div>';
+      }
+      if (html) {
+        document.getElementById('teamTop3Container').innerHTML = html;
+        document.getElementById('top3Source').textContent = '✅ Revision(수정 이력) 기반 Top 3 — ' + new Date().toLocaleString('ko-KR');
+      }
+    }
+
+    // Update employee Drive data
+    EMPLOYEES.forEach(e => {
+      const count = files.filter(f => f.owner === e.name).length;
+      e.drive = count;
+    });
+    renderOverview();
+    renderEmployeeTable();
+    const empChart = Chart.getChart('chartEmployee');
+    if (empChart) { empChart.data.datasets[1].data = EMPLOYEES.map(e => e.drive); empChart.update(); }
+
+    // ===== 채널톡 데이터 처리 =====
+    if (data.channeltalk && data.channeltalk.chats_weekly) {
+      var ct = data.channeltalk.chats_weekly;
+      document.getElementById('ctTotalChats').textContent = ct.total || 0;
+      document.getElementById('ctParticipants').textContent = Object.keys(ct.by_assignee || {}).length;
+      document.getElementById('ctApiSection').style.display = 'block';
+      document.getElementById('ctOpen').textContent = (ct.by_state && ct.by_state.opened) || 0;
+      document.getElementById('ctAssigned').textContent = (ct.by_state && ct.by_state.assigned) || 0;
+      document.getElementById('ctSolved').textContent = (ct.by_state && ct.by_state.solved) || 0;
+      document.getElementById('ctClosed').textContent = (ct.by_state && ct.by_state.closed) || 0;
+      // 담당자별 테이블
+      var aTable = document.getElementById('ctAssigneeTable');
+      if (aTable && ct.by_assignee) {
+        var aEntries = Object.entries(ct.by_assignee).sort(function(a,b) { return b[1]-a[1]; });
+        aTable.innerHTML = aEntries.map(function(e) {
+          var pct = ct.total > 0 ? Math.round(e[1]/ct.total*100) : 0;
+          return '<tr><td><strong>' + escapeHtml(e[0]) + '</strong></td><td>' + e[1] + '건</td><td><div class="kpi-progress"><div class="bar"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent)"></div></div><span class="pct">' + pct + '%</span></div></td></tr>';
+        }).join('');
+      }
+      // 최근 상담 테이블
+      var rTable = document.getElementById('ctRecentTable');
+      if (rTable && ct.recent) {
+        var stateLabels = { opened:'🟢 진행', assigned:'🔵 배정', solved:'🟣 해결', closed:'⚫ 종료' };
+        rTable.innerHTML = ct.recent.map(function(r) {
+          var dt = new Date(r.created).toLocaleDateString('ko-KR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+          return '<tr><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.name) + '</td><td>' + (stateLabels[r.state] || r.state) + '</td><td>' + escapeHtml(r.assignee) + '</td><td style="white-space:nowrap">' + dt + '</td></tr>';
+        }).join('');
+      }
+      // 채널톡 차트 업데이트
+      var chatChart = Chart.getChart('chartChat');
+      if (chatChart && ct.by_assignee) {
+        var labels = Object.keys(ct.by_assignee);
+        var vals = labels.map(function(k) { return ct.by_assignee[k]; });
+        chatChart.data.labels = labels;
+        chatChart.data.datasets[0].data = vals;
+        chatChart.update();
+      }
+    }
+
+    // ===== Notion 데이터 처리 =====
+    var notionByUser = {};
+    if (data.notion && data.notion.notion_weekly) {
+      notionByUser = data.notion.notion_weekly;
+      // EMPLOYEES notion_pg 업데이트
+      EMPLOYEES.forEach(function(emp) {
+        if (notionByUser[emp.name]) emp.notion_pg = notionByUser[emp.name].count;
+      });
+      // Notion 차트 업데이트
+      var notionChart = Chart.getChart('chartNotion');
+      if (notionChart) { notionChart.data.datasets[0].data = EMPLOYEES.map(function(e) { return e.notion_pg; }); notionChart.update(); }
+    }
+
+    // ===== 금주 개인별 생성·수정 — 동적 렌더링 =====
+    const teamColors = { 'CEO':'var(--accent)', 'Biz.(Sales)':'var(--accent)', 'Biz.(Operation)':'var(--accent)', 'Biz.':'var(--accent)', 'Engineer':'var(--green)', 'Dev.':'var(--purple)', 'Dev.(Lab.)':'var(--purple)', 'Dev.(Data)':'var(--purple)' };
+    const weekGrid = document.getElementById('weeklyPersonGrid');
+    if (weekGrid && thisWeekFiles.length > 0) {
+      var personHtml = '';
+      EMPLOYEES.forEach(function(emp) {
+        var bc = teamColors[emp.team] || 'var(--accent)';
+        // Notion 페이지 (API 연동 시)
+        var notionPages = (notionByUser[emp.name] && notionByUser[emp.name].pages) || [];
+        // 이번 주 파일: owner 기준 + recent_revisions 내 해당 사용자 포함 파일
+        var myCreated = [];
+        var myModified = [];
+        thisWeekFiles.forEach(function(f) {
+          var isEditor = false;
+          if (f.recent_revisions && f.recent_revisions.length > 0) {
+            for (var ri = 0; ri < f.recent_revisions.length; ri++) {
+              if (f.recent_revisions[ri].user === emp.name) { isEditor = true; break; }
+            }
+          }
+          if (f.owner === emp.name || isEditor) {
+            var fileCreated = new Date(f.created);
+            if (fileCreated >= weekStart && fileCreated < weekEnd) {
+              myCreated.push(f);
+            } else {
+              myModified.push(f);
+            }
+          }
+        });
+        var cCount = myCreated.length;
+        var mCount = myModified.length;
+        personHtml += '<div style="background:#0f172a;border-radius:8px;padding:12px;border-left:3px solid ' + bc + '">';
+        personHtml += '<div style="font-weight:700;margin-bottom:8px">' + escapeHtml(emp.name) + ' <span style="color:var(--muted);font-weight:400;font-size:12px">' + escapeHtml(emp.team) + ' · 생성 ' + cCount + '건 · 수정 ' + mCount + '건</span></div>';
+        // Notion 섹션
+        personHtml += '<div style="font-size:11px;color:var(--purple);font-weight:600;margin-bottom:4px">Notion (' + notionPages.length + '건)</div>';
+        if (notionPages.length === 0) {
+          personHtml += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:8px">— 이번 주 Notion 생성 없음' + (!data.notion ? ' (API 미연동)' : '') + '</div>';
+        } else {
+          personHtml += '<div style="font-size:12px;line-height:1.8;padding-left:8px">';
+          notionPages.slice(0, 3).forEach(function(p) {
+            var dt = new Date(p.created);
+            personHtml += '<a href="' + p.url + '" target="_blank">' + escapeHtml(p.title) + '</a> <span class="badge badge-orange">Notion</span> ' + (dt.getMonth()+1) + '/' + ('0'+dt.getDate()).slice(-2) + '<br>';
+          });
+          if (notionPages.length > 3) personHtml += '<span style="color:var(--muted);font-size:11px">+' + (notionPages.length - 3) + '건 더</span>';
+          personHtml += '</div>';
+        }
+        // Drive 생성
+        personHtml += '<div style="font-size:11px;color:#facc15;font-weight:600;margin-bottom:4px;margin-top:6px">Drive 생성 (' + cCount + '건)</div>';
+        if (cCount === 0) {
+          personHtml += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:8px">— 이번 주 생성 없음</div>';
+        } else {
+          personHtml += '<div style="font-size:12px;line-height:1.8;padding-left:8px">';
+          myCreated.slice(0, 5).forEach(function(f) {
+            var fbc = f.type && f.type.includes('Sheets') ? 'badge-green' : f.type && f.type.includes('Slides') ? 'badge-purple' : f.type && f.type.includes('Docs') ? 'badge-blue' : 'badge-orange';
+            var dt = new Date(f.created);
+            personHtml += '<a href="' + f.url + '" target="_blank">' + escapeHtml(f.name) + '</a> <span class="badge ' + fbc + '">' + escapeHtml(f.type) + '</span> ' + (dt.getMonth()+1) + '/' + ('0'+dt.getDate()).slice(-2) + '<br>';
+          });
+          if (cCount > 5) personHtml += '<span style="color:var(--muted);font-size:11px">+' + (cCount - 5) + '건 더</span>';
+          personHtml += '</div>';
+        }
+        // Drive 수정
+        personHtml += '<div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:4px;margin-top:6px">Drive 수정 (' + mCount + '건)</div>';
+        if (mCount === 0) {
+          personHtml += '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding-left:8px">— 이번 주 수정 없음</div>';
+        } else {
+          personHtml += '<div style="font-size:12px;line-height:1.8;padding-left:8px">';
+          myModified.slice(0, 5).forEach(function(f) {
+            var fbc = f.type && f.type.includes('Sheets') ? 'badge-green' : f.type && f.type.includes('Slides') ? 'badge-purple' : f.type && f.type.includes('Docs') ? 'badge-blue' : 'badge-orange';
+            var dt = new Date(f.updated);
+            personHtml += '<a href="' + f.url + '" target="_blank">' + escapeHtml(f.name) + '</a> <span class="badge ' + fbc + '">' + escapeHtml(f.type) + '</span> ' + (dt.getMonth()+1) + '/' + ('0'+dt.getDate()).slice(-2) + '<br>';
+          });
+          if (mCount > 5) personHtml += '<span style="color:var(--muted);font-size:11px">+' + (mCount - 5) + '건 더</span>';
+          personHtml += '</div>';
+        }
+        personHtml += '</div>';
+      });
+      weekGrid.innerHTML = personHtml;
+    }
+
+  } catch (err) {
+    console.error('Drive load error:', err);
+    document.getElementById('driveStatus').innerHTML = '⚠️ Drive CORS 제한 — <a href="' + DRIVE_WEBAPP_URL + '" target="_blank" style="color:var(--yellow)">직접 열기</a>';
+    document.getElementById('driveStatus').style.color = '#eab308';
+  }
+}
+
+loadDriveData();
+// 10분마다 자동 갱신
+setInterval(loadDriveData, 10 * 60 * 1000);
+</script>
+</body>
+</html>
