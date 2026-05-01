@@ -756,7 +756,7 @@
     <h3>🕐 이번 주 수정된 파일</h3>
     <table>
       <thead><tr><th>파일명</th><th>유형</th><th>소유자</th><th>팀</th><th>최종 수정</th><th>링크</th></tr></thead>
-      <tbody id="driveRecentFiles"><tr><td colspan="6" style="text-align:center;color:var(--muted)">Drive 데이터 로딩 중... (CORS 제한 시 <a href="https://script.google.com/a/macros/netogreenkr.com/s/AKfycbyWH7qRi95fK50qCaDrE7b4IiVE-QZUozE_-bDKVgv1WM_uYAkQDBF4xrsWqzu5kkg/exec" target="_blank" style="color:var(--yellow)">직접 열기</a>)</td></tr></tbody>
+      <tbody id="driveRecentFiles"><tr><td colspan="6" style="text-align:center;color:var(--muted)">Drive 데이터 로딩 중... (CORS 제한 시 <a href="/api/drive-data" target="_blank" style="color:var(--yellow)">직접 열기</a>)</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -898,7 +898,7 @@
 
 <script>
 // ===== CONFIG =====
-const DRIVE_WEBAPP_URL = 'https://script.google.com/a/macros/netogreenkr.com/s/AKfycbyWH7qRi95fK50qCaDrE7b4IiVE-QZUozE_-bDKVgv1WM_uYAkQDBF4xrsWqzu5kkg/exec';
+const DRIVE_WEBAPP_URL = '/api/drive-data';
 const COLORS = ['#3b82f6','#22c55e','#a855f7','#f97316','#eab308','#ef4444','#06b6d4','#ec4899','#8b5cf6','#14b8a6'];
 
 // 이은혜 분석 제외 / 데이터 = Notion 페이지 + Drive (업무요청은 참고지표)
